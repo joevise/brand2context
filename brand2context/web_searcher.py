@@ -33,7 +33,10 @@ def search_expand(clues: dict) -> list[dict]:
             resp = requests.post(
                 TAVILY_ENDPOINT,
                 json={"query": q, "max_results": 5, "include_answer": True},
-                headers={"Content-Type": "application/json"},
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {TAVILY_API_KEY}",
+                },
                 timeout=30,
             )
             if resp.status_code == 401:
