@@ -9,7 +9,7 @@ services:
       - "8004:8000"
     environment:
       - MINIMAX_API_KEY=${MINIMAX_API_KEY:-sk-cp-49r5TFMzeb7-z-HCbtIPK3h7NZPVs8QJIPVIBC9S3JDjeHq4pKU6YZ-srAyN1YH3-LR6wS0ot4f6xEcqR34SsBpE-yPuW-9kb_yGlDRaive4lhwduA3UAZs}
-      - TAVILY_API_KEY=${TAVILY_API_KEY}
+      - TAVILY_API_KEY=${TAVILY_API_KEY:-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}
       - LINK2CONTEXT_URL=${LINK2CONTEXT_URL:-http://67.209.190.54:8000}
       - DATABASE_URL=sqlite:///data/brand2context.db
       - CHROMA_HOST=brand2context-chroma
