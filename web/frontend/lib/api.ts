@@ -76,6 +76,12 @@ export async function getEmbedConfig(id: string): Promise<any> {
   return res.json();
 }
 
+export async function searchBrand(id: string, query: string): Promise<{ documents: string[]; distances: number[]; metadatas: any[] }> {
+  const res = await fetch(`${API_URL}/api/brands/${id}/search?q=${encodeURIComponent(query)}`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Search failed");
+  return res.json();
+}
+
 export async function getBrandStats(id: string): Promise<{ brand_id: string; call_count: number; last_accessed: string | null }> {
   const res = await fetch(`${API_URL}/api/brands/${id}/stats`, { cache: "no-store" });
   if (!res.ok) throw new Error("Failed to fetch stats");

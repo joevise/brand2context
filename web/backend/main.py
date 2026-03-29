@@ -165,13 +165,17 @@ def search_brand_endpoint(brand_id: str, q: str = "", db: Session = Depends(get_
         from vector import search_brand
         results = search_brand(brand_id, q)
         if results:
+            docs = results.get("documents", [[]])[0]
+            distances = results.get("distances", [[]])[0]
+            metadatas = results.get("metadatas", [[]])[0]
             return {
-                "documents": results.get("documents", [[]])[0],
-                "distances": results.get("distances", [[]])[0],
+                "documents": docs,
+                "distances": distances,
+                "metadatas": metadatas,
             }
-        return {"documents": [], "distances": []}
+        return {"documents": [], "distances": [], "metadatas": []}
     except Exception as e:
-        return {"documents": [], "distances": [], "error": str(e)}
+        return {"documents": [], "distances": [], "metadatas": [], "error": str(e)}
 
 
 # --- Helper: record API call ---
@@ -212,11 +216,30 @@ def chat_with_brand(brand_id: str, body: ChatRequest, db: Session = Depends(get_
     with open(json_path, "r", encoding="utf-8") as f:
         knowledge = json.load(f)
 
+    # Try vector search first for more relevant context
+    context_text = None
+    try:
+        from vector import search_brand
+        vector_results = search_brand(brand_id, body.message, n_results=5)
+        if vector_results and vector_results.get("documents") and vector_results["documents"][0]:
+            chunks = vector_results["documents"][0]
+            # Always include identity context
+            identity = knowledge.get("identity", {})
+            identity_ctx = f"Brand: {identity.get('name', 'Unknown')}\nTagline: {identity.get('tagline', '')}\nPositioning: {identity.get('positioning', '')}"
+            relevant = "\n\n".join(chunks)
+            context_text = f"{identity_ctx}\n\nRelevant knowledge:\n{relevant}"
+    except Exception:
+        pass
+
+    if not context_text:
+        # Fallback to full JSON
+        context_text = f"Brand Knowledge Base:\n{json.dumps(knowledge, ensure_ascii=False, indent=2)}"
+
     system_prompt = (
         "You are a brand knowledge assistant. Answer questions about this brand based ONLY "
         "on the provided knowledge base data. Be concise and accurate. If the data doesn't "
         "contain the answer, say so.\n\n"
-        f"Brand Knowledge Base:\n{json.dumps(knowledge, ensure_ascii=False, indent=2)}"
+        f"{context_text}"
     )
 
     try:
