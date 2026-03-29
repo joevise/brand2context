@@ -2,13 +2,13 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Brand2Context Brand Knowledge Schema",
   "description": "Structured brand knowledge for AI consumption, covering the full consumer decision journey.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "object",
   "required": ["schema_version", "identity", "offerings", "access"],
   "properties": {
     "schema_version": {
       "type": "string",
-      "const": "0.1.0"
+      "const": "0.2.0"
     },
     "generated_at": {
       "type": "string",
@@ -242,6 +242,74 @@
           }
         },
         "brand_guidelines_public": { "type": "string" }
+      }
+    },
+
+    "perception": {
+      "type": "object",
+      "description": "Brand perception coordinates — how consumers perceive the brand (Aaker personality model)",
+      "properties": {
+        "personality_traits": { "type": "array", "items": { "type": "string" } },
+        "brand_tone": { "type": "string" },
+        "price_positioning": { "type": "string", "enum": ["mass", "mid-range", "accessible-luxury", "premium", "ultra-premium"] },
+        "price_benchmark": { "type": "string" },
+        "primary_audience": {
+          "type": "object",
+          "properties": {
+            "demographics": { "type": "string" },
+            "psychographics": { "type": "string" },
+            "lifestyle": { "type": "string" }
+          }
+        },
+        "anti_audience": { "type": "string" },
+        "category_association": { "type": "string" },
+        "usage_occasions": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+
+    "decision_factors": {
+      "type": "object",
+      "description": "Decision factor weights — key purchase factors and brand performance (Fishbein model)",
+      "properties": {
+        "category_key_factors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "factor": { "type": "string" },
+              "brand_score": { "type": "string" },
+              "evidence": { "type": "string" }
+            }
+          }
+        },
+        "perceived_risks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "risk": { "type": "string" },
+              "mitigation": { "type": "string" }
+            }
+          }
+        },
+        "switching_cost": { "type": "string" },
+        "trial_barrier": { "type": "string" }
+      }
+    },
+
+    "vitality": {
+      "type": "object",
+      "description": "Brand vitality indicators — growth trajectory and activity signals",
+      "properties": {
+        "content_frequency": { "type": "string" },
+        "last_product_launch": { "type": "string" },
+        "last_campaign": { "type": "string" },
+        "growth_signal": { "type": "string" },
+        "community_size": { "type": "string" },
+        "nps_or_satisfaction": { "type": "string" },
+        "repeat_purchase_rate": { "type": "string" },
+        "market_position": { "type": "string" },
+        "industry_role": { "type": "string", "enum": ["leader", "challenger", "follower", "nicher"] }
       }
     }
   }
