@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { Copy, Check, Globe, Package, Shield, MessageCircle, ChevronDown, Zap } from "lucide-react";
+import { Copy, Check, Globe, Package, Shield, MessageCircle, ChevronDown, Zap, Calendar } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -66,6 +66,7 @@ export default function PublicKBPage() {
   const trust = d?.trust;
   const experience = d?.experience;
   const access = d?.access;
+  const campaigns = d?.campaigns;
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-10">
@@ -146,9 +147,50 @@ export default function PublicKBPage() {
             </div>
           </Accordion>
         )}
-      </div>
 
-      {/* AI Integration */}
+        {campaigns && (campaigns.ongoing?.length > 0 || campaigns.recent?.length > 0 || campaigns.upcoming?.length > 0 || campaigns.annual_events?.length > 0) && (
+          <Accordion title="品牌活动" icon={Calendar}>
+            <div className="space-y-3 text-sm">
+              {campaigns.ongoing?.length > 0 && (
+                <div>
+                  <h4 className="font-medium mb-1">进行中</h4>
+                  {campaigns.ongoing.map((c: any, i: number) => (
+                    <div key={i} className="mb-2 p-2 rounded bg-green-50 dark:bg-green-900/10">
+                      <span className="font-medium">{c.name}</span>
+                      {c.type && <span className="ml-2 text-xs text-[var(--muted-foreground)]">{c.type}</span>}
+                      {c.description && <p className="text-xs text-[var(--muted-foreground)] mt-1">{c.description}</p>}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {campaigns.recent?.length > 0 && (
+                <div>
+                  <h4 className="font-medium mb-1">近期活动</h4>
+                  {campaigns.recent.map((c: any, i: number) => (
+                    <div key={i} className="mb-2"><span className="font-medium">{c.name}</span>{c.date && <span className="ml-2 text-xs text-[var(--muted-foreground)]">{c.date}</span>}{c.impact && <p className="text-xs text-[var(--muted-foreground)]">效果：{c.impact}</p>}</div>
+                  ))}
+                </div>
+              )}
+              {campaigns.upcoming?.length > 0 && (
+                <div>
+                  <h4 className="font-medium mb-1">即将到来</h4>
+                  {campaigns.upcoming.map((c: any, i: number) => (
+                    <div key={i} className="mb-2"><span className="font-medium">{c.name}</span><span className="ml-2 px-2 py-0.5 rounded-full text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700">即将开始</span>{c.preview && <p className="text-xs text-[var(--muted-foreground)] mt-1">{c.preview}</p>}</div>
+                  ))}
+                </div>
+              )}
+              {campaigns.annual_events?.length > 0 && (
+                <div>
+                  <h4 className="font-medium mb-1">年度活动</h4>
+                  {campaigns.annual_events.map((c: any, i: number) => (
+                    <div key={i} className="mb-2"><span className="font-medium">{c.name}</span>{c.frequency && <span className="ml-2 text-xs text-[var(--muted-foreground)]">{c.frequency}</span>}</div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </Accordion>
+        )}
+      </div>
       {config && (
         <div className="mt-10 p-6 rounded-2xl border border-primary-200 dark:border-primary-800 bg-primary-50 dark:bg-primary-950/20">
           <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">

@@ -40,7 +40,7 @@ export default function Home() {
             <span className="gradient-text">品牌知识库</span>
           </h1>
           <p className="text-xl text-[var(--muted-foreground)] max-w-2xl mx-auto mb-12">
-            输入网址，即可自动生成结构化、AI 可用的品牌知识库，涵盖品牌身份、产品服务、信任背书等十大维度。
+            输入网址，即可自动生成结构化、AI 可用的品牌知识库，涵盖品牌身份、产品服务、信任背书等十一大维度。
           </p>
 
           {/* URL Input */}
@@ -80,7 +80,7 @@ export default function Home() {
         <div className="grid md:grid-cols-3 gap-8">
           {[
             { icon: Globe, title: "智能爬取", desc: "自动爬取网站内容，提取品牌信号、线索和结构化数据。" },
-            { icon: Brain, title: "AI 结构化", desc: "利用大语言模型将原始数据结构化为 10 大品牌维度。" },
+            { icon: Brain, title: "AI 结构化", desc: "利用大语言模型将原始数据结构化为 11 大品牌维度。" },
             { icon: Database, title: "MCP 就绪", desc: "通过 MCP 协议对外提供品牌知识，AI Agent 可直接调用。" },
           ].map(({ icon: Icon, title, desc }) => (
             <div key={title} className="p-6 rounded-2xl border border-[var(--border)] bg-[var(--card)] hover:shadow-lg transition">
@@ -96,9 +96,9 @@ export default function Home() {
 
       {/* Schema dimensions */}
       <section className="max-w-4xl mx-auto px-4 pb-20">
-        <h2 className="text-3xl font-bold text-center mb-10">品牌十大维度</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-          {["品牌身份", "产品服务", "差异化优势", "信任背书", "用户体验", "获取方式", "内容资产", "品牌感知", "决策因子", "品牌活力"].map(
+        <h2 className="text-3xl font-bold text-center mb-10">品牌十一大维度</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {["品牌身份", "产品服务", "差异化优势", "信任背书", "用户体验", "获取方式", "内容资产", "品牌感知", "决策因子", "品牌活力", "品牌活动"].map(
             (dim) => (
               <div key={dim} className="text-center p-4 rounded-xl bg-[var(--muted)] hover:bg-primary-50 dark:hover:bg-primary-900/20 transition">
                 <span className="text-sm font-medium">{dim}</span>

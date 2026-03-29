@@ -20,7 +20,7 @@ Brand2Context 帮品牌把散落在全网的公开信息（官网、公众号、
 
 ## 品牌知识 Schema
 
-Brand2Context 使用标准化的品牌知识 Schema，覆盖消费者决策全链路的 10 个维度。
+Brand2Context 使用标准化的品牌知识 Schema，覆盖消费者决策全链路的 11 个维度。
 
 详见 [schema/README.md](schema/README.md)
 

@@ -25,6 +25,7 @@ def search_expand(clues: dict) -> list[dict]:
         queries.append(f"{company} 融资 投资")
     if category:
         queries.append(f"{name} {category}")
+    queries.append(f"{name} 活动 新品 发布 2026")
 
     print(f"🔎 Running {len(queries)} web searches...")
     results = []

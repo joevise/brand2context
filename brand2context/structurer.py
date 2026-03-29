@@ -41,14 +41,14 @@ def structure_brand(url: str, pages: list[dict], clues: dict, search_results: li
 
     prompt = f"""You are a brand analyst creating a comprehensive brand knowledge base. 
 
-Based on ALL the information provided below, generate a complete JSON object that matches the Brand Knowledge Schema v0.2.
+Based on ALL the information provided below, generate a complete JSON object that matches the Brand Knowledge Schema v0.3.
 
 ## SCHEMA (you MUST follow this structure exactly):
 {schema_text}
 
 ## RULES:
 1. Fill EVERY field you can from the provided data. Leave out fields only if truly no data exists.
-2. "schema_version" MUST be "0.2.0"
+2. "schema_version" MUST be "0.3.0"
 3. "generated_at" should be "{datetime.now(timezone.utc).isoformat()}"
 4. "source_urls" should include "{url}"
 5. "identity" and "offerings" are REQUIRED - always fill them
@@ -57,8 +57,9 @@ Based on ALL the information provided below, generate a complete JSON object tha
 8. For "perception", infer brand personality from tone, messaging, and positioning
 9. For "decision_factors", analyze what would matter to buyers in this category
 10. For "vitality", assess how active/growing the brand appears
-11. For arrays of objects, include at least the required fields
-12. Output ONLY valid JSON, no commentary
+11. For "campaigns", fill ongoing (current campaigns), recent (past campaigns with impact), upcoming (announced future campaigns), and annual_events (recurring brand events). Look for product launches, promotions, collaborations, exhibitions, charity events, brand experiences.
+12. For arrays of objects, include at least the required fields
+13. Output ONLY valid JSON, no commentary
 
 ## EXTRACTED CLUES:
 {clues_text}
@@ -74,7 +75,7 @@ Generate the complete brand knowledge JSON now:"""
     try:
         result = chat_json(prompt, system="You are a brand intelligence analyst. Output ONLY valid JSON matching the schema. Be thorough and precise. 请用中文填写所有字段内容。品牌名称、专有名词可保留英文原文。", max_tokens=16000)
         # Ensure required fields
-        result["schema_version"] = "0.2.0"
+        result["schema_version"] = "0.3.0"
         result["generated_at"] = datetime.now(timezone.utc).isoformat()
         if "source_urls" not in result:
             result["source_urls"] = [url]

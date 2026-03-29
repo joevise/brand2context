@@ -6,7 +6,7 @@ import {
   Building2, Package, Sparkles, Shield, MessageCircle, MapPin,
   Newspaper, Eye, BarChart3, Activity, Loader2, ArrowLeft, ExternalLink,
   Star, Award, Users, Globe, Mail, Phone, Pencil, Save, XCircle, Check,
-  Search, Plus, Trash2, X
+  Search, Plus, Trash2, X, Calendar
 } from "lucide-react";
 import Link from "next/link";
 import { ChatPanel } from "@/components/chat-panel";
@@ -178,7 +178,7 @@ function KBSearchBar({ brandId }: { brandId: string }) {
   const DIMENSION_LABELS: Record<string, string> = {
     identity: "品牌身份", offerings: "产品服务", differentiation: "差异化优势",
     trust: "信任背书", experience: "用户体验", access: "获取方式",
-    content: "内容资产", perception: "品牌感知", decision_factors: "决策因子", vitality: "品牌活力",
+    content: "内容资产", perception: "品牌感知", decision_factors: "决策因子", vitality: "品牌活力", campaigns: "品牌活动",
   };
 
   const doSearch = async () => {
@@ -663,6 +663,93 @@ function VitalitySection({ data, editMode, onUpdate }: { data: any; editMode: bo
   );
 }
 
+function CampaignsSection({ data, editMode, onUpdate }: { data: any; editMode: boolean; onUpdate: (section: string, data: any) => void }) {
+  if (!data) return null;
+  const ongoing = data.ongoing || [];
+  const recent = data.recent || [];
+  const upcoming = data.upcoming || [];
+  const annual = data.annual_events || [];
+
+  return (
+    <Section title="品牌活动" icon={Calendar} editMode={editMode} onEdit={() => {}}>
+      {ongoing.length > 0 && (
+        <div className="mb-4">
+          <h3 className="text-sm font-semibold mb-2 text-[var(--muted-foreground)]">进行中的活动</h3>
+          <div className="grid sm:grid-cols-2 gap-3">
+            {ongoing.map((item: any, i: number) => (
+              <div key={i} className="p-3 rounded-lg bg-[var(--muted)]">
+                <div className="flex items-center gap-2 mb-1">
+                  <h4 className="font-medium text-sm">{item.name}</h4>
+                  <span className="px-2 py-0.5 rounded-full text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">进行中</span>
+                </div>
+                {item.type && <p className="text-xs text-primary-600 mb-1">{item.type}</p>}
+                {item.description && <p className="text-xs text-[var(--muted-foreground)]">{item.description}</p>}
+                {(item.start_date || item.end_date) && <p className="text-xs text-[var(--muted-foreground)] mt-1">{item.start_date} — {item.end_date}</p>}
+                {item.highlights?.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1">{item.highlights.map((h: string, j: number) => <span key={j} className="px-2 py-0.5 rounded-full text-xs bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300">{h}</span>)}</div>
+                )}
+                {item.url && <a href={item.url} target="_blank" rel="noopener" className="text-xs text-primary-600 hover:underline mt-1 inline-block">查看详情 →</a>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {recent.length > 0 && (
+        <div className="mb-4">
+          <h3 className="text-sm font-semibold mb-2 text-[var(--muted-foreground)]">近期活动</h3>
+          <div className="grid sm:grid-cols-2 gap-3">
+            {recent.map((item: any, i: number) => (
+              <div key={i} className="p-3 rounded-lg bg-[var(--muted)]">
+                <h4 className="font-medium text-sm">{item.name}</h4>
+                {item.type && <p className="text-xs text-primary-600">{item.type}</p>}
+                {item.date && <p className="text-xs text-[var(--muted-foreground)]">{item.date}</p>}
+                {item.summary && <p className="text-xs text-[var(--muted-foreground)] mt-1">{item.summary}</p>}
+                {item.impact && <p className="text-xs mt-1"><strong>效果：</strong>{item.impact}</p>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {upcoming.length > 0 && (
+        <div className="mb-4">
+          <h3 className="text-sm font-semibold mb-2 text-[var(--muted-foreground)]">即将到来</h3>
+          <div className="grid sm:grid-cols-2 gap-3">
+            {upcoming.map((item: any, i: number) => (
+              <div key={i} className="p-3 rounded-lg bg-[var(--muted)]">
+                <div className="flex items-center gap-2 mb-1">
+                  <h4 className="font-medium text-sm">{item.name}</h4>
+                  <span className="px-2 py-0.5 rounded-full text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">即将开始</span>
+                </div>
+                {item.type && <p className="text-xs text-primary-600">{item.type}</p>}
+                {item.expected_date && <p className="text-xs text-[var(--muted-foreground)]">预计：{item.expected_date}</p>}
+                {item.preview && <p className="text-xs text-[var(--muted-foreground)] mt-1">{item.preview}</p>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {annual.length > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold mb-2 text-[var(--muted-foreground)]">年度活动</h3>
+          <div className="grid sm:grid-cols-2 gap-3">
+            {annual.map((item: any, i: number) => (
+              <div key={i} className="p-3 rounded-lg bg-[var(--muted)]">
+                <h4 className="font-medium text-sm">{item.name}</h4>
+                {item.frequency && <p className="text-xs text-[var(--muted-foreground)]">频率：{item.frequency}</p>}
+                {item.typical_month && <p className="text-xs text-[var(--muted-foreground)]">通常月份：{item.typical_month}</p>}
+                {item.description && <p className="text-xs text-[var(--muted-foreground)] mt-1">{item.description}</p>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </Section>
+  );
+}
+
 export default function BrandDetailPage() {
   const params = useParams();
   const id = params.id as string;
@@ -777,6 +864,7 @@ export default function BrandDetailPage() {
           <PerceptionSection data={d.perception} editMode={editMode} onUpdate={handleUpdate} />
           <DecisionSection data={d.decision_factors} editMode={editMode} onUpdate={handleUpdate} />
           <VitalitySection data={d.vitality} editMode={editMode} onUpdate={handleUpdate} />
+          <CampaignsSection data={d.campaigns} editMode={editMode} onUpdate={handleUpdate} />
           <IntegrationPanel brandId={id} />
         </div>
       )}
