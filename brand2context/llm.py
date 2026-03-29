@@ -23,7 +23,7 @@ def chat(prompt: str, system: str = "", max_tokens: int = 16000, temperature: fl
             "max_tokens": max_tokens,
             "temperature": temperature,
         },
-        timeout=120,
+        timeout=300,
     )
     resp.raise_for_status()
     data = resp.json()
