@@ -43,7 +43,7 @@ Website content:
 {combined[:30000]}"""
 
     try:
-        clues = chat_json(prompt, system="You are a brand analyst. Extract factual information only. Return valid JSON.")
+        clues = chat_json(prompt, system="You are a brand analyst. Extract factual information only. Return valid JSON. 请用中文输出所有内容。")
         clues["source_url"] = url
         clues["clues_extracted"] = True
         brand = clues.get("brand_name", "")

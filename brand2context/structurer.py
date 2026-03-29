@@ -72,7 +72,7 @@ Based on ALL the information provided below, generate a complete JSON object tha
 Generate the complete brand knowledge JSON now:"""
 
     try:
-        result = chat_json(prompt, system="You are a brand intelligence analyst. Output ONLY valid JSON matching the schema. Be thorough and precise.", max_tokens=16000)
+        result = chat_json(prompt, system="You are a brand intelligence analyst. Output ONLY valid JSON matching the schema. Be thorough and precise. 请用中文填写所有字段内容。品牌名称、专有名词可保留英文原文。", max_tokens=16000)
         # Ensure required fields
         result["schema_version"] = "0.2.0"
         result["generated_at"] = datetime.now(timezone.utc).isoformat()

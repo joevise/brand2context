@@ -236,9 +236,7 @@ def chat_with_brand(brand_id: str, body: ChatRequest, db: Session = Depends(get_
         context_text = f"Brand Knowledge Base:\n{json.dumps(knowledge, ensure_ascii=False, indent=2)}"
 
     system_prompt = (
-        "You are a brand knowledge assistant. Answer questions about this brand based ONLY "
-        "on the provided knowledge base data. Be concise and accurate. If the data doesn't "
-        "contain the answer, say so.\n\n"
+        "你是品牌知识库助手。请根据提供的品牌知识库数据回答问题，简洁准确。如果数据中没有相关信息，请说明。\n\n"
         f"{context_text}"
     )
 

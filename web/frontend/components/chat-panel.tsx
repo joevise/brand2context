@@ -31,7 +31,7 @@ export function ChatPanel({ brandId }: { brandId: string }) {
       const res = await chatWithBrand(brandId, userMsg);
       setMessages((prev) => [...prev, { role: "ai", content: res.answer }]);
     } catch {
-      setMessages((prev) => [...prev, { role: "ai", content: "Sorry, something went wrong." }]);
+      setMessages((prev) => [...prev, { role: "ai", content: "抱歉，出了点问题。" }]);
     } finally {
       setLoading(false);
     }
@@ -56,7 +56,7 @@ export function ChatPanel({ brandId }: { brandId: string }) {
           <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)] bg-primary-600 text-white">
             <div className="flex items-center gap-2">
               <MessageCircle className="w-5 h-5" />
-              <span className="font-semibold">Ask about this brand</span>
+              <span className="font-semibold">知识库问答</span>
             </div>
             <button onClick={() => setOpen(false)} className="p-1 hover:bg-white/20 rounded">
               <X className="w-4 h-4" />
@@ -67,7 +67,7 @@ export function ChatPanel({ brandId }: { brandId: string }) {
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
             {messages.length === 0 && (
               <div className="text-center py-6">
-                <p className="text-sm text-[var(--muted-foreground)] mb-4">Ask anything about this brand&apos;s knowledge base</p>
+                <p className="text-sm text-[var(--muted-foreground)] mb-4">输入任何关于此品牌知识库的问题</p>
                 <div className="flex flex-wrap gap-2 justify-center">
                   {SUGGESTIONS.map((s) => (
                     <button
@@ -117,7 +117,7 @@ export function ChatPanel({ brandId }: { brandId: string }) {
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Type a question..."
+                placeholder="输入问题..."
                 className="flex-1 px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm focus:outline-none focus:ring-2 focus:ring-primary-600"
                 disabled={loading}
               />

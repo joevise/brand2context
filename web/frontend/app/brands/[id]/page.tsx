@@ -51,16 +51,16 @@ function EditModal({ title, value, onSave, onCancel }: { title: string; value: s
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onCancel}>
       <div className="bg-[var(--card)] rounded-2xl p-6 w-full max-w-lg mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <h3 className="text-lg font-semibold mb-4">Edit {title}</h3>
+        <h3 className="text-lg font-semibold mb-4">编辑 {title}</h3>
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
           className="w-full h-40 px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 resize-none"
         />
         <div className="flex justify-end gap-2 mt-4">
-          <button onClick={onCancel} className="px-4 py-2 rounded-lg text-sm hover:bg-[var(--muted)] transition">Cancel</button>
+          <button onClick={onCancel} className="px-4 py-2 rounded-lg text-sm hover:bg-[var(--muted)] transition">取消</button>
           <button onClick={() => onSave(text)} className="px-4 py-2 rounded-lg bg-primary-600 text-white text-sm hover:bg-primary-700 transition flex items-center gap-1">
-            <Save className="w-3 h-3" /> Save
+            <Save className="w-3 h-3" /> 保存
           </button>
         </div>
       </div>
@@ -77,7 +77,7 @@ function EditArrayModal({ title, values, onSave, onCancel }: { title: string; va
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onCancel}>
       <div className="bg-[var(--card)] rounded-2xl p-6 w-full max-w-lg mx-4 shadow-2xl max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <h3 className="text-lg font-semibold mb-4">Edit {title}</h3>
+        <h3 className="text-lg font-semibold mb-4">编辑 {title}</h3>
         <div className="space-y-2">
           {items.map((item, i) => (
             <div key={i} className="flex gap-2">
@@ -86,10 +86,10 @@ function EditArrayModal({ title, values, onSave, onCancel }: { title: string; va
             </div>
           ))}
         </div>
-        <button onClick={add} className="mt-3 inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm bg-[var(--muted)] hover:bg-primary-100 dark:hover:bg-primary-900/30 transition"><Plus className="w-3 h-3" /> Add Item</button>
+        <button onClick={add} className="mt-3 inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm bg-[var(--muted)] hover:bg-primary-100 dark:hover:bg-primary-900/30 transition"><Plus className="w-3 h-3" /> 添加</button>
         <div className="flex justify-end gap-2 mt-4">
-          <button onClick={onCancel} className="px-4 py-2 rounded-lg text-sm hover:bg-[var(--muted)] transition">Cancel</button>
-          <button onClick={() => onSave(items.filter(Boolean))} className="px-4 py-2 rounded-lg bg-primary-600 text-white text-sm hover:bg-primary-700 transition flex items-center gap-1"><Save className="w-3 h-3" /> Save</button>
+          <button onClick={onCancel} className="px-4 py-2 rounded-lg text-sm hover:bg-[var(--muted)] transition">取消</button>
+          <button onClick={() => onSave(items.filter(Boolean))} className="px-4 py-2 rounded-lg bg-primary-600 text-white text-sm hover:bg-primary-700 transition flex items-center gap-1"><Save className="w-3 h-3" /> 保存</button>
         </div>
       </div>
     </div>
@@ -103,7 +103,7 @@ function EditObjectModal({ title, fields, values, onSave, onCancel }: { title: s
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onCancel}>
       <div className="bg-[var(--card)] rounded-2xl p-6 w-full max-w-lg mx-4 shadow-2xl max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <h3 className="text-lg font-semibold mb-4">Edit {title}</h3>
+        <h3 className="text-lg font-semibold mb-4">编辑 {title}</h3>
         <div className="space-y-3">
           {fields.map((f) => (
             <div key={f.key}>
@@ -113,8 +113,8 @@ function EditObjectModal({ title, fields, values, onSave, onCancel }: { title: s
           ))}
         </div>
         <div className="flex justify-end gap-2 mt-4">
-          <button onClick={onCancel} className="px-4 py-2 rounded-lg text-sm hover:bg-[var(--muted)] transition">Cancel</button>
-          <button onClick={() => onSave(data)} className="px-4 py-2 rounded-lg bg-primary-600 text-white text-sm hover:bg-primary-700 transition flex items-center gap-1"><Save className="w-3 h-3" /> Save</button>
+          <button onClick={onCancel} className="px-4 py-2 rounded-lg text-sm hover:bg-[var(--muted)] transition">取消</button>
+          <button onClick={() => onSave(data)} className="px-4 py-2 rounded-lg bg-primary-600 text-white text-sm hover:bg-primary-700 transition flex items-center gap-1"><Save className="w-3 h-3" /> 保存</button>
         </div>
       </div>
     </div>
@@ -130,7 +130,7 @@ function EditObjectArrayModal({ title, fields, values, onSave, onCancel }: { tit
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onCancel}>
       <div className="bg-[var(--card)] rounded-2xl p-6 w-full max-w-lg mx-4 shadow-2xl max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <h3 className="text-lg font-semibold mb-4">Edit {title}</h3>
+        <h3 className="text-lg font-semibold mb-4">编辑 {title}</h3>
         <div className="space-y-4">
           {items.map((item, i) => (
             <div key={i} className="p-3 rounded-xl border border-[var(--border)] space-y-2">
@@ -147,10 +147,10 @@ function EditObjectArrayModal({ title, fields, values, onSave, onCancel }: { tit
             </div>
           ))}
         </div>
-        <button onClick={add} className="mt-3 inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm bg-[var(--muted)] hover:bg-primary-100 dark:hover:bg-primary-900/30 transition"><Plus className="w-3 h-3" /> Add Item</button>
+        <button onClick={add} className="mt-3 inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm bg-[var(--muted)] hover:bg-primary-100 dark:hover:bg-primary-900/30 transition"><Plus className="w-3 h-3" /> 添加</button>
         <div className="flex justify-end gap-2 mt-4">
-          <button onClick={onCancel} className="px-4 py-2 rounded-lg text-sm hover:bg-[var(--muted)] transition">Cancel</button>
-          <button onClick={() => onSave(items)} className="px-4 py-2 rounded-lg bg-primary-600 text-white text-sm hover:bg-primary-700 transition flex items-center gap-1"><Save className="w-3 h-3" /> Save</button>
+          <button onClick={onCancel} className="px-4 py-2 rounded-lg text-sm hover:bg-[var(--muted)] transition">取消</button>
+          <button onClick={() => onSave(items)} className="px-4 py-2 rounded-lg bg-primary-600 text-white text-sm hover:bg-primary-700 transition flex items-center gap-1"><Save className="w-3 h-3" /> 保存</button>
         </div>
       </div>
     </div>
@@ -176,9 +176,9 @@ function KBSearchBar({ brandId }: { brandId: string }) {
   const [open, setOpen] = useState(false);
 
   const DIMENSION_LABELS: Record<string, string> = {
-    identity: "Identity", offerings: "Offerings", differentiation: "Differentiation",
-    trust: "Trust Signals", experience: "Experience", access: "Access & Contact",
-    content: "Content & News", perception: "Perception", decision_factors: "Decision Factors", vitality: "Vitality",
+    identity: "品牌身份", offerings: "产品服务", differentiation: "差异化优势",
+    trust: "信任背书", experience: "用户体验", access: "获取方式",
+    content: "内容资产", perception: "品牌感知", decision_factors: "决策因子", vitality: "品牌活力",
   };
 
   const doSearch = async () => {
@@ -216,7 +216,7 @@ function KBSearchBar({ brandId }: { brandId: string }) {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search this knowledge base..."
+            placeholder="搜索知识库..."
             className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--card)] text-sm focus:outline-none focus:ring-2 focus:ring-primary-600"
           />
         </div>
@@ -227,10 +227,10 @@ function KBSearchBar({ brandId }: { brandId: string }) {
       {open && results && (
         <div className="absolute top-full left-0 right-0 mt-2 z-40 rounded-xl border border-[var(--border)] bg-[var(--card)] shadow-xl max-h-80 overflow-y-auto">
           <div className="flex items-center justify-between px-4 py-2 border-b border-[var(--border)]">
-            <span className="text-xs text-[var(--muted-foreground)]">{results.documents.length} result{results.documents.length !== 1 ? "s" : ""}</span>
+            <span className="text-xs text-[var(--muted-foreground)]">{results.documents.length} 条结果</span>
             <button onClick={() => setOpen(false)} className="p-1 hover:bg-[var(--muted)] rounded"><X className="w-3 h-3" /></button>
           </div>
-          {results.documents.length === 0 && <div className="p-4 text-sm text-[var(--muted-foreground)] text-center">No results found</div>}
+          {results.documents.length === 0 && <div className="p-4 text-sm text-[var(--muted-foreground)] text-center">未找到结果</div>}
           {results.documents.map((doc, i) => {
             const meta = results.metadatas?.[i] || {};
             const dim = meta.dimension || "unknown";
@@ -271,7 +271,7 @@ function IdentityCard({ data, editMode, onUpdate }: { data: any; editMode: boole
   };
 
   return (
-    <Section title="Identity" icon={Building2} editMode={editMode}>
+    <Section title="品牌身份" icon={Building2} editMode={editMode}>
       {editing && (
         <EditModal title={editing} value={data[editing] || ""} onSave={(v) => handleSave(editing, v)} onCancel={() => setEditing(null)} />
       )}
@@ -303,17 +303,17 @@ function IdentityCard({ data, editMode, onUpdate }: { data: any; editMode: boole
         </div>
         {data.mission && (
           <EditableField editMode={editMode} onClick={() => setEditing("mission")}>
-            <div className="p-4 rounded-xl bg-[var(--muted)]"><p className="text-sm"><strong>Mission:</strong> {data.mission}</p></div>
+            <div className="p-4 rounded-xl bg-[var(--muted)]"><p className="text-sm"><strong>使命：</strong> {data.mission}</p></div>
           </EditableField>
         )}
         {data.vision && (
           <EditableField editMode={editMode} onClick={() => setEditing("vision")}>
-            <div className="p-4 rounded-xl bg-[var(--muted)]"><p className="text-sm"><strong>Vision:</strong> {data.vision}</p></div>
+            <div className="p-4 rounded-xl bg-[var(--muted)]"><p className="text-sm"><strong>愿景：</strong> {data.vision}</p></div>
           </EditableField>
         )}
         {(data.values?.length > 0 || editMode) && (
           <EditableField editMode={editMode} onClick={() => setEditingArray("values")}>
-            <div><h4 className="text-sm font-medium mb-2">Values</h4><div className="flex flex-wrap gap-2">{(data.values || []).map((v: string, i: number) => <Tag key={i}>{v}</Tag>)}</div></div>
+            <div><h4 className="text-sm font-medium mb-2">价值观</h4><div className="flex flex-wrap gap-2">{(data.values || []).map((v: string, i: number) => <Tag key={i}>{v}</Tag>)}</div></div>
           </EditableField>
         )}
         {data.brand_story && (
@@ -343,7 +343,7 @@ function OfferingsGrid({ data, editMode, onUpdate }: { data: any[]; editMode: bo
   };
 
   return (
-    <Section title={`Offerings (${items.length})`} icon={Package} editMode={editMode} onEdit={() => setEditingIdx(0)}>
+    <Section title={`产品服务 (${items.length})`} icon={Package} editMode={editMode} onEdit={() => setEditingIdx(0)}>
       {editingIdx !== null && (
         <EditObjectArrayModal
           title="Offerings"
@@ -390,7 +390,7 @@ function DifferentiationSection({ data, editMode, onUpdate }: { data: any; editM
   const [editObjArr, setEditObjArr] = useState<string | null>(null);
 
   return (
-    <Section title="Differentiation" icon={Sparkles} editMode={editMode} onEdit={() => setEditField("unique_selling_points")}>
+    <Section title="差异化优势" icon={Sparkles} editMode={editMode} onEdit={() => setEditField("unique_selling_points")}>
       {editField === "unique_selling_points" && (
         <EditArrayModal title="Unique Selling Points" values={data.unique_selling_points || []} onSave={(v) => { onUpdate("differentiation", { ...data, unique_selling_points: v }); setEditField(null); }} onCancel={() => setEditField(null)} />
       )}
@@ -406,22 +406,22 @@ function DifferentiationSection({ data, editMode, onUpdate }: { data: any; editM
       <div className="space-y-4">
         {data.unique_selling_points?.length > 0 && (
           <EditableField editMode={editMode} onClick={() => setEditField("unique_selling_points")}>
-            <div><h4 className="text-sm font-medium mb-2">Unique Selling Points</h4>{data.unique_selling_points.map((p: string, i: number) => <div key={i} className="flex items-start gap-2 mb-2"><Sparkles className="w-4 h-4 text-primary-600 mt-0.5 flex-shrink-0" /><span className="text-sm">{p}</span></div>)}</div>
+            <div><h4 className="text-sm font-medium mb-2">独特卖点</h4>{data.unique_selling_points.map((p: string, i: number) => <div key={i} className="flex items-start gap-2 mb-2"><Sparkles className="w-4 h-4 text-primary-600 mt-0.5 flex-shrink-0" /><span className="text-sm">{p}</span></div>)}</div>
           </EditableField>
         )}
         {data.competitive_advantages?.length > 0 && (
           <EditableField editMode={editMode} onClick={() => setEditField("competitive_advantages")}>
-            <div><h4 className="text-sm font-medium mb-2">Competitive Advantages</h4><div className="flex flex-wrap gap-2">{data.competitive_advantages.map((a: string, i: number) => <Tag key={i}>{a}</Tag>)}</div></div>
+            <div><h4 className="text-sm font-medium mb-2">竞争优势</h4><div className="flex flex-wrap gap-2">{data.competitive_advantages.map((a: string, i: number) => <Tag key={i}>{a}</Tag>)}</div></div>
           </EditableField>
         )}
         {data.technology_highlights?.length > 0 && (
           <EditableField editMode={editMode} onClick={() => setEditField("technology_highlights")}>
-            <div><h4 className="text-sm font-medium mb-2">Technology</h4><ul className="space-y-1 text-sm">{data.technology_highlights.map((t: string, i: number) => <li key={i}>• {t}</li>)}</ul></div>
+            <div><h4 className="text-sm font-medium mb-2">技术亮点</h4><ul className="space-y-1 text-sm">{data.technology_highlights.map((t: string, i: number) => <li key={i}>• {t}</li>)}</ul></div>
           </EditableField>
         )}
         {data.awards?.length > 0 && (
           <EditableField editMode={editMode} onClick={() => setEditObjArr("awards")}>
-            <div><h4 className="text-sm font-medium mb-2">Awards</h4>{data.awards.map((a: any, i: number) => <div key={i} className="flex items-center gap-2 text-sm"><Award className="w-4 h-4 text-yellow-500" />{a.name} {a.year && `(${a.year})`}</div>)}</div>
+            <div><h4 className="text-sm font-medium mb-2">荣誉奖项</h4>{data.awards.map((a: any, i: number) => <div key={i} className="flex items-center gap-2 text-sm"><Award className="w-4 h-4 text-yellow-500" />{a.name} {a.year && `(${a.year})`}</div>)}</div>
           </EditableField>
         )}
       </div>
@@ -435,7 +435,7 @@ function TrustSection({ data, editMode, onUpdate }: { data: any; editMode: boole
   const [editObjArr, setEditObjArr] = useState<string | null>(null);
 
   return (
-    <Section title="Trust Signals" icon={Shield} editMode={editMode} onEdit={() => setEditField("certifications")}>
+    <Section title="信任背书" icon={Shield} editMode={editMode} onEdit={() => setEditField("certifications")}>
       {editField === "certifications" && (
         <EditArrayModal title="Certifications" values={data.certifications || []} onSave={(v) => { onUpdate("trust", { ...data, certifications: v }); setEditField(null); }} onCancel={() => setEditField(null)} />
       )}
@@ -449,8 +449,8 @@ function TrustSection({ data, editMode, onUpdate }: { data: any; editMode: boole
         <EditObjectArrayModal title="Testimonials" fields={[{ key: "quote", label: "Quote" }, { key: "source", label: "Source" }]} values={data.testimonials || []} onSave={(v) => { onUpdate("trust", { ...data, testimonials: v }); setEditObjArr(null); }} onCancel={() => setEditObjArr(null)} />
       )}
       <div className="space-y-4">
-        {data.certifications?.length > 0 && <EditableField editMode={editMode} onClick={() => setEditField("certifications")}><div><h4 className="text-sm font-medium mb-2">Certifications</h4><div className="flex flex-wrap gap-2">{data.certifications.map((c: string, i: number) => <Tag key={i}>{c}</Tag>)}</div></div></EditableField>}
-        {data.partnerships?.length > 0 && <EditableField editMode={editMode} onClick={() => setEditField("partnerships")}><div><h4 className="text-sm font-medium mb-2">Partnerships</h4><div className="flex flex-wrap gap-2">{data.partnerships.map((p: string, i: number) => <Tag key={i}>{p}</Tag>)}</div></div></EditableField>}
+        {data.certifications?.length > 0 && <EditableField editMode={editMode} onClick={() => setEditField("certifications")}><div><h4 className="text-sm font-medium mb-2">资质认证</h4><div className="flex flex-wrap gap-2">{data.certifications.map((c: string, i: number) => <Tag key={i}>{c}</Tag>)}</div></div></EditableField>}
+        {data.partnerships?.length > 0 && <EditableField editMode={editMode} onClick={() => setEditField("partnerships")}><div><h4 className="text-sm font-medium mb-2">合作伙伴</h4><div className="flex flex-wrap gap-2">{data.partnerships.map((p: string, i: number) => <Tag key={i}>{p}</Tag>)}</div></div></EditableField>}
         {data.user_stats?.length > 0 && <EditableField editMode={editMode} onClick={() => setEditObjArr("user_stats")}><div className="grid grid-cols-2 sm:grid-cols-3 gap-3">{data.user_stats.map((s: any, i: number) => <div key={i} className="p-3 rounded-xl bg-[var(--muted)] text-center"><div className="text-lg font-bold text-primary-600">{s.value}</div><div className="text-xs text-[var(--muted-foreground)]">{s.metric}</div></div>)}</div></EditableField>}
         {data.testimonials?.length > 0 && <EditableField editMode={editMode} onClick={() => setEditObjArr("testimonials")}><div className="space-y-3">{data.testimonials.map((t: any, i: number) => <blockquote key={i} className="border-l-2 border-primary-600 pl-4 italic text-sm text-[var(--muted-foreground)]">&ldquo;{t.quote}&rdquo; — {t.source}</blockquote>)}</div></EditableField>}
       </div>
@@ -464,7 +464,7 @@ function ExperienceSection({ data, editMode, onUpdate }: { data: any; editMode: 
   const [editObjArr, setEditObjArr] = useState<string | null>(null);
 
   return (
-    <Section title="Experience & FAQ" icon={MessageCircle} editMode={editMode} onEdit={() => setEditing("warranty")}>
+    <Section title="用户体验" icon={MessageCircle} editMode={editMode} onEdit={() => setEditing("warranty")}>
       {editing && (
         <EditModal title={editing} value={data[editing] || ""} onSave={(v) => { onUpdate("experience", { ...data, [editing]: v }); setEditing(null); }} onCancel={() => setEditing(null)} />
       )}
@@ -481,7 +481,7 @@ function ExperienceSection({ data, editMode, onUpdate }: { data: any; editMode: 
         </div>
         {data.faq?.length > 0 && (
           <EditableField editMode={editMode} onClick={() => setEditObjArr("faq")}>
-            <div><h4 className="text-sm font-medium mb-3">FAQ</h4><div className="space-y-3">{data.faq.map((f: any, i: number) => <details key={i} className="group"><summary className="cursor-pointer font-medium text-sm hover:text-primary-600">{f.question}</summary><p className="mt-2 text-sm text-[var(--muted-foreground)] pl-4">{f.answer}</p></details>)}</div></div>
+            <div><h4 className="text-sm font-medium mb-3">常见问题</h4><div className="space-y-3">{data.faq.map((f: any, i: number) => <details key={i} className="group"><summary className="cursor-pointer font-medium text-sm hover:text-primary-600">{f.question}</summary><p className="mt-2 text-sm text-[var(--muted-foreground)] pl-4">{f.answer}</p></details>)}</div></div>
           </EditableField>
         )}
       </div>
@@ -496,7 +496,7 @@ function AccessSection({ data, editMode, onUpdate }: { data: any; editMode: bool
   const [editObjArr, setEditObjArr] = useState<string | null>(null);
 
   return (
-    <Section title="Access & Contact" icon={MapPin} editMode={editMode} onEdit={() => setEditing("official_website")}>
+    <Section title="获取方式" icon={MapPin} editMode={editMode} onEdit={() => setEditing("official_website")}>
       {editing && (
         <EditModal title={editing} value={data[editing] || ""} onSave={(v) => { onUpdate("access", { ...data, [editing]: v }); setEditing(null); }} onCancel={() => setEditing(null)} />
       )}
@@ -530,7 +530,7 @@ function ContentSection({ data, editMode, onUpdate }: { data: any; editMode: boo
   if (news.length === 0 && !data.blog_posts?.length && !editMode) return null;
 
   return (
-    <Section title="Content & News" icon={Newspaper} editMode={editMode} onEdit={() => setEditObjArr("latest_news")}>
+    <Section title="内容资产" icon={Newspaper} editMode={editMode} onEdit={() => setEditObjArr("latest_news")}>
       {editObjArr === "latest_news" && (
         <EditObjectArrayModal title="Latest News" fields={[{ key: "title", label: "Title" }, { key: "date", label: "Date" }, { key: "summary", label: "Summary" }]} values={data.latest_news || []} onSave={(v) => { onUpdate("content", { ...data, latest_news: v }); setEditObjArr(null); }} onCancel={() => setEditObjArr(null)} />
       )}
@@ -549,8 +549,8 @@ function ContentSection({ data, editMode, onUpdate }: { data: any; editMode: boo
         ))}
         {editMode && (
           <div className="flex gap-2">
-            <button onClick={() => setEditObjArr("latest_news")} className="text-xs text-primary-600 hover:underline">Edit News</button>
-            <button onClick={() => setEditObjArr("key_announcements")} className="text-xs text-primary-600 hover:underline">Edit Announcements</button>
+            <button onClick={() => setEditObjArr("latest_news")} className="text-xs text-primary-600 hover:underline">编辑新闻</button>
+            <button onClick={() => setEditObjArr("key_announcements")} className="text-xs text-primary-600 hover:underline">编辑公告</button>
           </div>
         )}
       </div>
@@ -565,7 +565,7 @@ function PerceptionSection({ data, editMode, onUpdate }: { data: any; editMode: 
   const [editObj, setEditObj] = useState<string | null>(null);
 
   return (
-    <Section title="Perception" icon={Eye} editMode={editMode} onEdit={() => setEditArr("personality_traits")}>
+    <Section title="品牌感知" icon={Eye} editMode={editMode} onEdit={() => setEditArr("personality_traits")}>
       {editing && <EditModal title={editing} value={data[editing] || ""} onSave={(v) => { onUpdate("perception", { ...data, [editing]: v }); setEditing(null); }} onCancel={() => setEditing(null)} />}
       {editArr === "personality_traits" && <EditArrayModal title="Personality Traits" values={data.personality_traits || []} onSave={(v) => { onUpdate("perception", { ...data, personality_traits: v }); setEditArr(null); }} onCancel={() => setEditArr(null)} />}
       {editArr === "usage_occasions" && <EditArrayModal title="Usage Occasions" values={data.usage_occasions || []} onSave={(v) => { onUpdate("perception", { ...data, usage_occasions: v }); setEditArr(null); }} onCancel={() => setEditArr(null)} />}
@@ -582,16 +582,16 @@ function PerceptionSection({ data, editMode, onUpdate }: { data: any; editMode: 
         {data.primary_audience && (
           <EditableField editMode={editMode} onClick={() => setEditObj("primary_audience")}>
             <div className="p-4 rounded-xl bg-[var(--muted)]">
-              <h4 className="text-sm font-medium mb-2 flex items-center gap-1"><Users className="w-4 h-4" /> Primary Audience</h4>
+              <h4 className="text-sm font-medium mb-2 flex items-center gap-1"><Users className="w-4 h-4" /> 目标受众</h4>
               <div className="text-sm space-y-1">
-                {data.primary_audience.demographics && <p><strong>Demographics:</strong> {data.primary_audience.demographics}</p>}
-                {data.primary_audience.psychographics && <p><strong>Psychographics:</strong> {data.primary_audience.psychographics}</p>}
-                {data.primary_audience.lifestyle && <p><strong>Lifestyle:</strong> {data.primary_audience.lifestyle}</p>}
+                {data.primary_audience.demographics && <p><strong>人口特征：</strong> {data.primary_audience.demographics}</p>}
+                {data.primary_audience.psychographics && <p><strong>心理特征：</strong> {data.primary_audience.psychographics}</p>}
+                {data.primary_audience.lifestyle && <p><strong>生活方式：</strong> {data.primary_audience.lifestyle}</p>}
               </div>
             </div>
           </EditableField>
         )}
-        {data.usage_occasions?.length > 0 && <EditableField editMode={editMode} onClick={() => setEditArr("usage_occasions")}><div><h4 className="text-sm font-medium mb-2">Usage Occasions</h4><div className="flex flex-wrap gap-2">{data.usage_occasions.map((o: string, i: number) => <Tag key={i}>{o}</Tag>)}</div></div></EditableField>}
+        {data.usage_occasions?.length > 0 && <EditableField editMode={editMode} onClick={() => setEditArr("usage_occasions")}><div><h4 className="text-sm font-medium mb-2">使用场景</h4><div className="flex flex-wrap gap-2">{data.usage_occasions.map((o: string, i: number) => <Tag key={i}>{o}</Tag>)}</div></div></EditableField>}
       </div>
     </Section>
   );
@@ -603,7 +603,7 @@ function DecisionSection({ data, editMode, onUpdate }: { data: any; editMode: bo
   const [editObjArr, setEditObjArr] = useState<string | null>(null);
 
   return (
-    <Section title="Decision Factors" icon={BarChart3} editMode={editMode} onEdit={() => setEditObjArr("category_key_factors")}>
+    <Section title="决策因子" icon={BarChart3} editMode={editMode} onEdit={() => setEditObjArr("category_key_factors")}>
       {editing && <EditModal title={editing} value={data[editing] || ""} onSave={(v) => { onUpdate("decision_factors", { ...data, [editing]: v }); setEditing(null); }} onCancel={() => setEditing(null)} />}
       {editObjArr === "category_key_factors" && (
         <EditObjectArrayModal title="Key Factors" fields={[{ key: "factor", label: "Factor" }, { key: "brand_score", label: "Score" }, { key: "evidence", label: "Evidence" }]} values={data.category_key_factors || []} onSave={(v) => { onUpdate("decision_factors", { ...data, category_key_factors: v }); setEditObjArr(null); }} onCancel={() => setEditObjArr(null)} />
@@ -629,7 +629,7 @@ function DecisionSection({ data, editMode, onUpdate }: { data: any; editMode: bo
         )}
         {data.perceived_risks?.length > 0 && (
           <EditableField editMode={editMode} onClick={() => setEditObjArr("perceived_risks")}>
-            <div><h4 className="text-sm font-medium mb-2">Perceived Risks</h4>{data.perceived_risks.map((r: any, i: number) => <div key={i} className="mb-2"><p className="text-sm font-medium text-red-500">⚠ {r.risk}</p>{r.mitigation && <p className="text-xs text-[var(--muted-foreground)] ml-4">→ {r.mitigation}</p>}</div>)}</div>
+            <div><h4 className="text-sm font-medium mb-2">感知风险</h4>{data.perceived_risks.map((r: any, i: number) => <div key={i} className="mb-2"><p className="text-sm font-medium text-red-500">⚠ {r.risk}</p>{r.mitigation && <p className="text-xs text-[var(--muted-foreground)] ml-4">→ {r.mitigation}</p>}</div>)}</div>
           </EditableField>
         )}
         <div className="grid sm:grid-cols-2 gap-4">
@@ -650,7 +650,7 @@ function VitalitySection({ data, editMode, onUpdate }: { data: any; editMode: bo
   const fields = ["content_frequency", "last_product_launch", "last_campaign", "growth_signal", "community_size", "nps_or_satisfaction", "market_position", "industry_role"];
 
   return (
-    <Section title="Vitality" icon={Activity} editMode={editMode} onEdit={() => setEditing(fields[0])}>
+    <Section title="品牌活力" icon={Activity} editMode={editMode} onEdit={() => setEditing(fields[0])}>
       {editing && <EditModal title={editing.replace(/_/g, " ")} value={data[editing] || ""} onSave={(v) => { onUpdate("vitality", { ...data, [editing]: v }); setEditing(null); }} onCancel={() => setEditing(null)} />}
       <div className="grid sm:grid-cols-2 gap-4">
         {fields.map((field) => (
@@ -712,7 +712,7 @@ export default function BrandDetailPage() {
   };
 
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-primary-600" /></div>;
-  if (!brand) return <div className="text-center py-20">Brand not found</div>;
+  if (!brand) return <div className="text-center py-20">品牌未找到</div>;
 
   const isGenerating = brand.status === "pending" || brand.status === "processing";
   const d = brand.data;
@@ -721,7 +721,7 @@ export default function BrandDetailPage() {
     <div className="max-w-5xl mx-auto px-4 py-10">
       <div className="flex items-center justify-between mb-6">
         <Link href="/brands" className="inline-flex items-center gap-1 text-sm text-[var(--muted-foreground)] hover:text-primary-600">
-          <ArrowLeft className="w-4 h-4" /> Back to brands
+          <ArrowLeft className="w-4 h-4" /> 返回列表
         </Link>
         <div className="flex items-center gap-3">
           {d && (
@@ -730,7 +730,7 @@ export default function BrandDetailPage() {
                 href={`/kb/${id}`}
                 className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm bg-[var(--muted)] hover:bg-primary-100 dark:hover:bg-primary-900/30 transition"
               >
-                <Globe className="w-3.5 h-3.5" /> Public Page
+                <Globe className="w-3.5 h-3.5" /> 公开页面
               </Link>
               <button
                 onClick={() => setEditMode(!editMode)}
@@ -740,7 +740,7 @@ export default function BrandDetailPage() {
                     : "bg-[var(--muted)] hover:bg-primary-100 dark:hover:bg-primary-900/30"
                 }`}
               >
-                {editMode ? <><Check className="w-3.5 h-3.5" /> Editing</> : <><Pencil className="w-3.5 h-3.5" /> Edit</>}
+                {editMode ? <><Check className="w-3.5 h-3.5" /> 编辑中</> : <><Pencil className="w-3.5 h-3.5" /> 编辑</>}
               </button>
             </>
           )}
@@ -751,15 +751,15 @@ export default function BrandDetailPage() {
       {isGenerating && (
         <div className="mb-8 p-8 rounded-2xl border border-primary-200 dark:border-primary-800 bg-primary-50 dark:bg-primary-950/20 text-center">
           <Loader2 className="w-10 h-10 animate-spin text-primary-600 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold mb-2">Generating Brand Knowledge Base</h2>
-          <p className="text-[var(--muted-foreground)]">Crawling {brand.url} and structuring data...</p>
-          <p className="text-xs text-[var(--muted-foreground)] mt-2">This usually takes 1-3 minutes</p>
+          <h2 className="text-xl font-semibold mb-2">正在生成品牌知识库</h2>
+          <p className="text-[var(--muted-foreground)]">正在爬取 {brand.url} 并结构化数据...</p>
+          <p className="text-xs text-[var(--muted-foreground)] mt-2">通常需要 1-3 分钟</p>
         </div>
       )}
 
       {brand.status === "error" && (
         <div className="mb-8 p-6 rounded-2xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/20">
-          <h2 className="text-xl font-semibold text-red-600 mb-2">Generation Failed</h2>
+          <h2 className="text-xl font-semibold text-red-600 mb-2">生成失败</h2>
           <p className="text-sm text-red-500">{brand.error_message || "Unknown error"}</p>
         </div>
       )}

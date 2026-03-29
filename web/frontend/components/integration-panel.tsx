@@ -54,10 +54,10 @@ export function IntegrationPanel({ brandId }: { brandId: string }) {
       <div className="px-6 py-4 border-b border-[var(--border)] bg-[var(--muted)]">
         <h2 className="flex items-center gap-2 text-lg font-semibold">
           <Code2 className="w-5 h-5 text-primary-600" />
-          Integration
+          接入指南
           <span className={`ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${isLive ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300" : "bg-gray-100 dark:bg-gray-800 text-gray-500"}`}>
             <span className={`w-2 h-2 rounded-full ${isLive ? "bg-green-500" : "bg-gray-400"}`} />
-            {isLive ? "Live" : "No calls yet"}
+            {isLive ? "已接入" : "暂无调用"}
           </span>
         </h2>
       </div>
@@ -69,22 +69,22 @@ export function IntegrationPanel({ brandId }: { brandId: string }) {
                 <Activity className="w-5 h-5 text-primary-600" />
                 <div>
                   <div className="text-lg font-bold">{stats.call_count}</div>
-                  <div className="text-xs text-[var(--muted-foreground)]">Total API Calls</div>
+                  <div className="text-xs text-[var(--muted-foreground)]">API 调用次数</div>
                 </div>
               </div>
               <div className="flex items-center gap-3 p-3 rounded-xl bg-[var(--muted)]">
                 <Clock className="w-5 h-5 text-primary-600" />
                 <div>
                   <div className="text-sm font-medium">{stats.last_accessed ? new Date(stats.last_accessed).toLocaleString() : "Never"}</div>
-                  <div className="text-xs text-[var(--muted-foreground)]">Last Accessed</div>
+                  <div className="text-xs text-[var(--muted-foreground)]">最后访问</div>
                 </div>
               </div>
             </>
           )}
         </div>
 
-        <CopyField label="MCP Endpoint" value={config.mcp_endpoint} />
-        <CopyField label="API Endpoint" value={config.api_endpoint} />
+        <CopyField label="MCP 端点" value={config.mcp_endpoint} />
+        <CopyField label="API 端点" value={config.api_endpoint} />
 
         {/* Code snippets */}
         <div>

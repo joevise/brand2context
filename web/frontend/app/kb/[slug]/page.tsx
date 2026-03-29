@@ -82,16 +82,16 @@ export default function PublicKBPage() {
       {/* Sections */}
       <div className="space-y-4">
         {identity && (
-          <Accordion title="About" icon={Globe} defaultOpen>
+          <Accordion title="关于" icon={Globe} defaultOpen>
             <div className="space-y-3 text-sm">
-              {identity.mission && <p><strong>Mission:</strong> {identity.mission}</p>}
-              {identity.vision && <p><strong>Vision:</strong> {identity.vision}</p>}
+              {identity.mission && <p><strong>使命：</strong> {identity.mission}</p>}
+              {identity.vision && <p><strong>愿景：</strong> {identity.vision}</p>}
               {identity.brand_story && <p>{identity.brand_story}</p>}
               <div className="grid grid-cols-2 gap-3">
-                {identity.founded && <div><span className="text-xs text-[var(--muted-foreground)]">Founded</span><div>{identity.founded}</div></div>}
-                {identity.headquarters && <div><span className="text-xs text-[var(--muted-foreground)]">HQ</span><div>{identity.headquarters}</div></div>}
-                {identity.category && <div><span className="text-xs text-[var(--muted-foreground)]">Category</span><div>{identity.category}</div></div>}
-                {identity.scale && <div><span className="text-xs text-[var(--muted-foreground)]">Scale</span><div>{identity.scale}</div></div>}
+                {identity.founded && <div><span className="text-xs text-[var(--muted-foreground)]">创立时间</span><div>{identity.founded}</div></div>}
+                {identity.headquarters && <div><span className="text-xs text-[var(--muted-foreground)]">总部</span><div>{identity.headquarters}</div></div>}
+                {identity.category && <div><span className="text-xs text-[var(--muted-foreground)]">行业</span><div>{identity.category}</div></div>}
+                {identity.scale && <div><span className="text-xs text-[var(--muted-foreground)]">规模</span><div>{identity.scale}</div></div>}
               </div>
               {identity.values?.length > 0 && (
                 <div className="flex flex-wrap gap-2">{identity.values.map((v: string, i: number) => <span key={i} className="px-3 py-1 rounded-full text-xs bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300">{v}</span>)}</div>
@@ -101,7 +101,7 @@ export default function PublicKBPage() {
         )}
 
         {offerings?.length > 0 && (
-          <Accordion title={`Products & Services (${offerings.length})`} icon={Package}>
+          <Accordion title={`产品服务 (${offerings.length})`} icon={Package}>
             <div className="grid sm:grid-cols-2 gap-3">
               {offerings.map((item: any, i: number) => (
                 <div key={i} className="p-3 rounded-lg bg-[var(--muted)]">
@@ -114,17 +114,17 @@ export default function PublicKBPage() {
         )}
 
         {trust && (
-          <Accordion title="Trust & Social Proof" icon={Shield}>
+          <Accordion title="信任背书" icon={Shield}>
             <div className="space-y-3 text-sm">
               {trust.certifications?.length > 0 && <div className="flex flex-wrap gap-2">{trust.certifications.map((c: string, i: number) => <span key={i} className="px-2 py-1 rounded-full text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">{c}</span>)}</div>}
-              {trust.partnerships?.length > 0 && <div><strong>Partners:</strong> {trust.partnerships.join(", ")}</div>}
+              {trust.partnerships?.length > 0 && <div><strong>合作伙伴：</strong> {trust.partnerships.join(", ")}</div>}
               {trust.testimonials?.length > 0 && trust.testimonials.map((t: any, i: number) => <blockquote key={i} className="border-l-2 border-primary-600 pl-3 italic text-[var(--muted-foreground)]">&ldquo;{t.quote}&rdquo; — {t.source}</blockquote>)}
             </div>
           </Accordion>
         )}
 
         {experience?.faq?.length > 0 && (
-          <Accordion title="FAQ" icon={MessageCircle}>
+          <Accordion title="常见问题" icon={MessageCircle}>
             <div className="space-y-3">
               {experience.faq.map((f: any, i: number) => (
                 <details key={i} className="group">
@@ -137,7 +137,7 @@ export default function PublicKBPage() {
         )}
 
         {access && (
-          <Accordion title="Contact" icon={Globe}>
+          <Accordion title="联系方式" icon={Globe}>
             <div className="text-sm space-y-2">
               {access.official_website && <a href={access.official_website} target="_blank" rel="noopener" className="text-primary-600 hover:underline block">{access.official_website}</a>}
               {access.contact?.email && <p>Email: {access.contact.email}</p>}
@@ -153,7 +153,7 @@ export default function PublicKBPage() {
         <div className="mt-10 p-6 rounded-2xl border border-primary-200 dark:border-primary-800 bg-primary-50 dark:bg-primary-950/20">
           <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
             <Zap className="w-5 h-5 text-primary-600" />
-            Connect this Knowledge Base to AI
+            将此知识库接入 AI
           </h2>
           <div className="space-y-4">
             <div>
@@ -171,7 +171,7 @@ export default function PublicKBPage() {
               </div>
             </div>
             <div className="text-sm text-[var(--muted-foreground)] space-y-1">
-              <p><strong>Quick Start:</strong></p>
+              <p><strong>快速开始：</strong></p>
               {config.instructions?.map((s: string, i: number) => <p key={i}>{s}</p>)}
             </div>
           </div>
