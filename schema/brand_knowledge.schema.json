@@ -1,0 +1,248 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Brand2Context Brand Knowledge Schema",
+  "description": "Structured brand knowledge for AI consumption, covering the full consumer decision journey.",
+  "version": "0.1.0",
+  "type": "object",
+  "required": ["schema_version", "identity", "offerings", "access"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "0.1.0"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When this knowledge base was generated/updated"
+    },
+    "source_urls": {
+      "type": "array",
+      "items": { "type": "string", "format": "uri" },
+      "description": "Source URLs used to build this knowledge base"
+    },
+
+    "identity": {
+      "type": "object",
+      "required": ["name", "positioning"],
+      "properties": {
+        "name": { "type": "string" },
+        "legal_name": { "type": "string" },
+        "founded": { "type": "string" },
+        "headquarters": { "type": "string" },
+        "tagline": { "type": "string" },
+        "mission": { "type": "string" },
+        "vision": { "type": "string" },
+        "values": { "type": "array", "items": { "type": "string" } },
+        "positioning": { "type": "string" },
+        "category": { "type": "string" },
+        "sub_categories": { "type": "array", "items": { "type": "string" } },
+        "brand_story": { "type": "string" },
+        "founder": { "type": "string" },
+        "scale": { "type": "string" }
+      }
+    },
+
+    "offerings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "description"],
+        "properties": {
+          "name": { "type": "string" },
+          "category": { "type": "string" },
+          "description": { "type": "string" },
+          "key_features": { "type": "array", "items": { "type": "string" } },
+          "specs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": { "type": "string" },
+                "value": { "type": "string" }
+              }
+            }
+          },
+          "price_range": { "type": "string" },
+          "currency": { "type": "string" },
+          "target_audience": { "type": "string" },
+          "use_cases": { "type": "array", "items": { "type": "string" } },
+          "is_flagship": { "type": "boolean" },
+          "launch_date": { "type": "string" },
+          "status": { "type": "string", "enum": ["active", "discontinued", "upcoming"] }
+        }
+      }
+    },
+
+    "differentiation": {
+      "type": "object",
+      "properties": {
+        "unique_selling_points": { "type": "array", "items": { "type": "string" } },
+        "competitive_advantages": { "type": "array", "items": { "type": "string" } },
+        "technology_highlights": { "type": "array", "items": { "type": "string" } },
+        "patents_or_certifications": { "type": "array", "items": { "type": "string" } },
+        "awards": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "year": { "type": "string" },
+              "issuer": { "type": "string" }
+            }
+          }
+        },
+        "comparison_notes": { "type": "string" }
+      }
+    },
+
+    "trust": {
+      "type": "object",
+      "properties": {
+        "certifications": { "type": "array", "items": { "type": "string" } },
+        "partnerships": { "type": "array", "items": { "type": "string" } },
+        "media_coverage": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "outlet": { "type": "string" },
+              "title": { "type": "string" },
+              "date": { "type": "string" },
+              "url": { "type": "string", "format": "uri" }
+            }
+          }
+        },
+        "investor_backed": { "type": "string" },
+        "user_stats": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "metric": { "type": "string" },
+              "value": { "type": "string" }
+            }
+          }
+        },
+        "testimonials": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "source": { "type": "string" },
+              "quote": { "type": "string" },
+              "verified": { "type": "boolean" }
+            }
+          }
+        }
+      }
+    },
+
+    "experience": {
+      "type": "object",
+      "properties": {
+        "warranty": { "type": "string" },
+        "return_policy": { "type": "string" },
+        "customer_service": {
+          "type": "object",
+          "properties": {
+            "channels": { "type": "array", "items": { "type": "string" } },
+            "hours": { "type": "string" }
+          }
+        },
+        "faq": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "question": { "type": "string" },
+              "answer": { "type": "string" }
+            }
+          }
+        },
+        "onboarding": { "type": "string" },
+        "community": { "type": "string" }
+      }
+    },
+
+    "access": {
+      "type": "object",
+      "required": ["official_website"],
+      "properties": {
+        "official_website": { "type": "string", "format": "uri" },
+        "online_stores": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "platform": { "type": "string" },
+              "url": { "type": "string", "format": "uri" }
+            }
+          }
+        },
+        "offline_presence": { "type": "string" },
+        "contact": {
+          "type": "object",
+          "properties": {
+            "phone": { "type": "string" },
+            "email": { "type": "string", "format": "email" },
+            "address": { "type": "string" }
+          }
+        },
+        "social_media": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "platform": { "type": "string" },
+              "handle": { "type": "string" },
+              "url": { "type": "string", "format": "uri" }
+            }
+          }
+        },
+        "app": { "type": "string" }
+      }
+    },
+
+    "content": {
+      "type": "object",
+      "properties": {
+        "latest_news": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": { "type": "string" },
+              "date": { "type": "string" },
+              "summary": { "type": "string" },
+              "url": { "type": "string", "format": "uri" }
+            }
+          }
+        },
+        "blog_posts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": { "type": "string" },
+              "date": { "type": "string" },
+              "summary": { "type": "string" },
+              "url": { "type": "string", "format": "uri" }
+            }
+          }
+        },
+        "key_announcements": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": { "type": "string" },
+              "date": { "type": "string" },
+              "content": { "type": "string" }
+            }
+          }
+        },
+        "brand_guidelines_public": { "type": "string" }
+      }
+    }
+  }
+}
