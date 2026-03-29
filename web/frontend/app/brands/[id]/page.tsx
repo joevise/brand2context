@@ -1,22 +1,29 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { getBrand, getBrandStatus, Brand } from "@/lib/api";
+import { getBrand, getBrandStatus, updateKnowledge, Brand } from "@/lib/api";
 import {
   Building2, Package, Sparkles, Shield, MessageCircle, MapPin,
   Newspaper, Eye, BarChart3, Activity, Loader2, ArrowLeft, ExternalLink,
-  Star, Award, Users, Globe, Mail, Phone
+  Star, Award, Users, Globe, Mail, Phone, Pencil, Save, XCircle, Check
 } from "lucide-react";
 import Link from "next/link";
+import { ChatPanel } from "@/components/chat-panel";
+import { IntegrationPanel } from "@/components/integration-panel";
 
-function Section({ title, icon: Icon, children, color = "primary" }: any) {
+function Section({ title, icon: Icon, children, editMode, onEdit }: any) {
   return (
     <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] overflow-hidden">
-      <div className="px-6 py-4 border-b border-[var(--border)] bg-[var(--muted)]">
+      <div className="px-6 py-4 border-b border-[var(--border)] bg-[var(--muted)] flex items-center justify-between">
         <h2 className="flex items-center gap-2 text-lg font-semibold">
           <Icon className="w-5 h-5 text-primary-600" />
           {title}
         </h2>
+        {editMode && onEdit && (
+          <button onClick={onEdit} className="p-1.5 rounded-lg hover:bg-primary-100 dark:hover:bg-primary-900/30 text-primary-600 transition">
+            <Pencil className="w-4 h-4" />
+          </button>
+        )}
       </div>
       <div className="p-6">{children}</div>
     </div>
@@ -37,17 +44,62 @@ function KV({ label, value }: { label: string; value: any }) {
   );
 }
 
-function IdentityCard({ data }: { data: any }) {
-  if (!data) return null;
+// Inline edit modal
+function EditModal({ title, value, onSave, onCancel }: { title: string; value: string; onSave: (v: string) => void; onCancel: () => void }) {
+  const [text, setText] = useState(value);
   return (
-    <Section title="Identity" icon={Building2}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onCancel}>
+      <div className="bg-[var(--card)] rounded-2xl p-6 w-full max-w-lg mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <h3 className="text-lg font-semibold mb-4">Edit {title}</h3>
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          className="w-full h-40 px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 resize-none"
+        />
+        <div className="flex justify-end gap-2 mt-4">
+          <button onClick={onCancel} className="px-4 py-2 rounded-lg text-sm hover:bg-[var(--muted)] transition">Cancel</button>
+          <button onClick={() => onSave(text)} className="px-4 py-2 rounded-lg bg-primary-600 text-white text-sm hover:bg-primary-700 transition flex items-center gap-1">
+            <Save className="w-3 h-3" /> Save
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function IdentityCard({ data, editMode, onUpdate }: { data: any; editMode: boolean; onUpdate: (section: string, data: any) => void }) {
+  const [editing, setEditing] = useState<string | null>(null);
+  if (!data) return null;
+
+  const handleSave = (field: string, value: string) => {
+    onUpdate("identity", { [field]: value });
+    setEditing(null);
+  };
+
+  return (
+    <Section title="Identity" icon={Building2} editMode={editMode} onEdit={() => setEditing("tagline")}>
+      {editing && (
+        <EditModal
+          title={editing}
+          value={data[editing] || ""}
+          onSave={(v) => handleSave(editing, v)}
+          onCancel={() => setEditing(null)}
+        />
+      )}
       <div className="space-y-6">
         <div>
           <h3 className="text-2xl font-bold mb-1">{data.name}</h3>
-          {data.tagline && <p className="text-lg text-primary-600 italic">&ldquo;{data.tagline}&rdquo;</p>}
+          {data.tagline && (
+            <p className="text-lg text-primary-600 italic cursor-pointer group" onClick={() => editMode && setEditing("tagline")}>
+              &ldquo;{data.tagline}&rdquo;
+              {editMode && <Pencil className="w-3 h-3 inline ml-1 opacity-0 group-hover:opacity-100" />}
+            </p>
+          )}
         </div>
         {data.positioning && (
-          <p className="text-[var(--muted-foreground)] leading-relaxed">{data.positioning}</p>
+          <p className="text-[var(--muted-foreground)] leading-relaxed cursor-pointer" onClick={() => editMode && setEditing("positioning")}>
+            {data.positioning}
+          </p>
         )}
         <div className="grid sm:grid-cols-2 gap-4">
           <KV label="Legal Name" value={data.legal_name} />
@@ -68,10 +120,10 @@ function IdentityCard({ data }: { data: any }) {
   );
 }
 
-function OfferingsGrid({ data }: { data: any[] }) {
+function OfferingsGrid({ data, editMode }: { data: any[]; editMode: boolean }) {
   if (!data?.length) return null;
   return (
-    <Section title={`Offerings (${data.length})`} icon={Package}>
+    <Section title={`Offerings (${data.length})`} icon={Package} editMode={editMode}>
       <div className="grid sm:grid-cols-2 gap-4">
         {data.map((item, i) => (
           <div key={i} className="p-4 rounded-xl border border-[var(--border)] hover:shadow-md transition">
@@ -96,10 +148,10 @@ function OfferingsGrid({ data }: { data: any[] }) {
   );
 }
 
-function DifferentiationSection({ data }: { data: any }) {
+function DifferentiationSection({ data, editMode }: { data: any; editMode: boolean }) {
   if (!data) return null;
   return (
-    <Section title="Differentiation" icon={Sparkles}>
+    <Section title="Differentiation" icon={Sparkles} editMode={editMode}>
       <div className="space-y-4">
         {data.unique_selling_points?.length > 0 && (
           <div><h4 className="text-sm font-medium mb-2">Unique Selling Points</h4>{data.unique_selling_points.map((p: string, i: number) => <div key={i} className="flex items-start gap-2 mb-2"><Sparkles className="w-4 h-4 text-primary-600 mt-0.5 flex-shrink-0" /><span className="text-sm">{p}</span></div>)}</div>
@@ -118,10 +170,10 @@ function DifferentiationSection({ data }: { data: any }) {
   );
 }
 
-function TrustSection({ data }: { data: any }) {
+function TrustSection({ data, editMode }: { data: any; editMode: boolean }) {
   if (!data) return null;
   return (
-    <Section title="Trust Signals" icon={Shield}>
+    <Section title="Trust Signals" icon={Shield} editMode={editMode}>
       <div className="space-y-4">
         {data.certifications?.length > 0 && <div><h4 className="text-sm font-medium mb-2">Certifications</h4><div className="flex flex-wrap gap-2">{data.certifications.map((c: string, i: number) => <Tag key={i}>{c}</Tag>)}</div></div>}
         {data.partnerships?.length > 0 && <div><h4 className="text-sm font-medium mb-2">Partnerships</h4><div className="flex flex-wrap gap-2">{data.partnerships.map((p: string, i: number) => <Tag key={i}>{p}</Tag>)}</div></div>}
@@ -132,10 +184,10 @@ function TrustSection({ data }: { data: any }) {
   );
 }
 
-function ExperienceSection({ data }: { data: any }) {
+function ExperienceSection({ data, editMode }: { data: any; editMode: boolean }) {
   if (!data) return null;
   return (
-    <Section title="Experience & FAQ" icon={MessageCircle}>
+    <Section title="Experience & FAQ" icon={MessageCircle} editMode={editMode}>
       <div className="space-y-4">
         <div className="grid sm:grid-cols-2 gap-4">
           <KV label="Warranty" value={data.warranty} />
@@ -151,10 +203,10 @@ function ExperienceSection({ data }: { data: any }) {
   );
 }
 
-function AccessSection({ data }: { data: any }) {
+function AccessSection({ data, editMode }: { data: any; editMode: boolean }) {
   if (!data) return null;
   return (
-    <Section title="Access & Contact" icon={MapPin}>
+    <Section title="Access & Contact" icon={MapPin} editMode={editMode}>
       <div className="space-y-4">
         {data.official_website && <a href={data.official_website} target="_blank" rel="noopener" className="inline-flex items-center gap-2 text-primary-600 hover:underline"><Globe className="w-4 h-4" />{data.official_website}</a>}
         {data.contact && (
@@ -170,12 +222,12 @@ function AccessSection({ data }: { data: any }) {
   );
 }
 
-function ContentSection({ data }: { data: any }) {
+function ContentSection({ data, editMode }: { data: any; editMode: boolean }) {
   if (!data) return null;
   const news = [...(data.latest_news || []), ...(data.key_announcements || [])];
   if (news.length === 0 && !data.blog_posts?.length) return null;
   return (
-    <Section title="Content & News" icon={Newspaper}>
+    <Section title="Content & News" icon={Newspaper} editMode={editMode}>
       <div className="space-y-3">
         {news.map((n: any, i: number) => (
           <div key={i} className="p-3 rounded-xl bg-[var(--muted)]">
@@ -191,10 +243,10 @@ function ContentSection({ data }: { data: any }) {
   );
 }
 
-function PerceptionSection({ data }: { data: any }) {
+function PerceptionSection({ data, editMode }: { data: any; editMode: boolean }) {
   if (!data) return null;
   return (
-    <Section title="Perception" icon={Eye}>
+    <Section title="Perception" icon={Eye} editMode={editMode}>
       <div className="space-y-4">
         {data.personality_traits?.length > 0 && <div className="flex flex-wrap gap-2">{data.personality_traits.map((t: string, i: number) => <Tag key={i}>{t}</Tag>)}</div>}
         <div className="grid sm:grid-cols-2 gap-4">
@@ -219,10 +271,10 @@ function PerceptionSection({ data }: { data: any }) {
   );
 }
 
-function DecisionSection({ data }: { data: any }) {
+function DecisionSection({ data, editMode }: { data: any; editMode: boolean }) {
   if (!data) return null;
   return (
-    <Section title="Decision Factors" icon={BarChart3}>
+    <Section title="Decision Factors" icon={BarChart3} editMode={editMode}>
       <div className="space-y-4">
         {data.category_key_factors?.length > 0 && (
           <div className="space-y-2">
@@ -249,10 +301,10 @@ function DecisionSection({ data }: { data: any }) {
   );
 }
 
-function VitalitySection({ data }: { data: any }) {
+function VitalitySection({ data, editMode }: { data: any; editMode: boolean }) {
   if (!data) return null;
   return (
-    <Section title="Vitality" icon={Activity}>
+    <Section title="Vitality" icon={Activity} editMode={editMode}>
       <div className="grid sm:grid-cols-2 gap-4">
         <KV label="Content Frequency" value={data.content_frequency} />
         <KV label="Last Product Launch" value={data.last_product_launch} />
@@ -272,6 +324,8 @@ export default function BrandDetailPage() {
   const id = params.id as string;
   const [brand, setBrand] = useState<Brand | null>(null);
   const [loading, setLoading] = useState(true);
+  const [editMode, setEditMode] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     let interval: any;
@@ -301,6 +355,18 @@ export default function BrandDetailPage() {
     return () => interval && clearInterval(interval);
   }, [id]);
 
+  const handleUpdate = async (section: string, data: any) => {
+    setSaving(true);
+    try {
+      const updated = await updateKnowledge(id, { [section]: data });
+      setBrand((prev) => prev ? { ...prev, data: updated } : prev);
+    } catch (e) {
+      console.error("Update failed", e);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-primary-600" /></div>;
   if (!brand) return <div className="text-center py-20">Brand not found</div>;
 
@@ -309,9 +375,34 @@ export default function BrandDetailPage() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-10">
-      <Link href="/brands" className="inline-flex items-center gap-1 text-sm text-[var(--muted-foreground)] hover:text-primary-600 mb-6">
-        <ArrowLeft className="w-4 h-4" /> Back to brands
-      </Link>
+      <div className="flex items-center justify-between mb-6">
+        <Link href="/brands" className="inline-flex items-center gap-1 text-sm text-[var(--muted-foreground)] hover:text-primary-600">
+          <ArrowLeft className="w-4 h-4" /> Back to brands
+        </Link>
+        <div className="flex items-center gap-3">
+          {d && (
+            <>
+              <Link
+                href={`/kb/${id}`}
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm bg-[var(--muted)] hover:bg-primary-100 dark:hover:bg-primary-900/30 transition"
+              >
+                <Globe className="w-3.5 h-3.5" /> Public Page
+              </Link>
+              <button
+                onClick={() => setEditMode(!editMode)}
+                className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm transition ${
+                  editMode
+                    ? "bg-primary-600 text-white"
+                    : "bg-[var(--muted)] hover:bg-primary-100 dark:hover:bg-primary-900/30"
+                }`}
+              >
+                {editMode ? <><Check className="w-3.5 h-3.5" /> Editing</> : <><Pencil className="w-3.5 h-3.5" /> Edit</>}
+              </button>
+            </>
+          )}
+          {saving && <Loader2 className="w-4 h-4 animate-spin text-primary-600" />}
+        </div>
+      </div>
 
       {isGenerating && (
         <div className="mb-8 p-8 rounded-2xl border border-primary-200 dark:border-primary-800 bg-primary-50 dark:bg-primary-950/20 text-center">
@@ -331,18 +422,22 @@ export default function BrandDetailPage() {
 
       {d && (
         <div className="space-y-6">
-          <IdentityCard data={d.identity} />
-          <OfferingsGrid data={d.offerings} />
-          <DifferentiationSection data={d.differentiation} />
-          <TrustSection data={d.trust} />
-          <ExperienceSection data={d.experience} />
-          <AccessSection data={d.access} />
-          <ContentSection data={d.content} />
-          <PerceptionSection data={d.perception} />
-          <DecisionSection data={d.decision_factors} />
-          <VitalitySection data={d.vitality} />
+          <IdentityCard data={d.identity} editMode={editMode} onUpdate={handleUpdate} />
+          <OfferingsGrid data={d.offerings} editMode={editMode} />
+          <DifferentiationSection data={d.differentiation} editMode={editMode} />
+          <TrustSection data={d.trust} editMode={editMode} />
+          <ExperienceSection data={d.experience} editMode={editMode} />
+          <AccessSection data={d.access} editMode={editMode} />
+          <ContentSection data={d.content} editMode={editMode} />
+          <PerceptionSection data={d.perception} editMode={editMode} />
+          <DecisionSection data={d.decision_factors} editMode={editMode} />
+          <VitalitySection data={d.vitality} editMode={editMode} />
+          <IntegrationPanel brandId={id} />
         </div>
       )}
+
+      {/* Chat panel */}
+      {d && <ChatPanel brandId={id} />}
     </div>
   );
 }

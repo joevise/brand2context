@@ -1,7 +1,7 @@
 """SQLAlchemy models for Brand2Context."""
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, DateTime, Text, create_engine
+from sqlalchemy import Column, String, DateTime, Text, Integer, create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 import os
 
@@ -22,6 +22,14 @@ class Brand(Base):
     error_message = Column(Text, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+
+class ApiCallLog(Base):
+    __tablename__ = "api_call_logs"
+
+    brand_id = Column(String, primary_key=True)
+    call_count = Column(Integer, default=0)
+    last_accessed = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 def init_db():

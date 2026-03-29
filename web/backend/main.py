@@ -3,18 +3,25 @@ import json
 import os
 import uuid
 import threading
+import copy
 from datetime import datetime, timezone
 from typing import Optional
 
+import httpx
 from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from models import init_db, get_db, Brand
+from models import init_db, get_db, Brand, ApiCallLog, SessionLocal
 from tasks import run_brand_pipeline
 from mcp_server import handle_mcp_request
+
+MINIMAX_API_KEY = os.getenv(
+    "MINIMAX_API_KEY",
+    "sk-cp-49r5TFMzeb7-z-HCbtIPK3h7NZPVs8QJIPVIBC9S3JDjeHq4pKU6YZ-srAyN1YH3-LR6wS0ot4f6xEcqR34SsBpE-yPuW-9kb_yGlDRaive4lhwduA3UAZs",
+)
 
 app = FastAPI(title="Brand2Context API", version="0.1.0")
 
@@ -101,6 +108,9 @@ def get_brand(brand_id: str, db: Session = Depends(get_db)):
 
     result = brand_to_response(brand)
 
+    # Track API call
+    _record_call(brand_id)
+
     # Include full JSON data if available
     json_path = os.path.join(DATA_DIR, f"{brand_id}.json")
     if os.path.exists(json_path):
@@ -162,6 +172,168 @@ def search_brand_endpoint(brand_id: str, q: str = "", db: Session = Depends(get_
         return {"documents": [], "distances": []}
     except Exception as e:
         return {"documents": [], "distances": [], "error": str(e)}
+
+
+# --- Helper: record API call ---
+
+def _record_call(brand_id: str):
+    """Increment API call counter for a brand."""
+    try:
+        db = SessionLocal()
+        log = db.query(ApiCallLog).filter(ApiCallLog.brand_id == brand_id).first()
+        if log:
+            log.call_count += 1
+            log.last_accessed = datetime.now(timezone.utc)
+        else:
+            log = ApiCallLog(brand_id=brand_id, call_count=1)
+            db.add(log)
+        db.commit()
+        db.close()
+    except Exception:
+        pass
+
+
+# --- Chat Endpoint ---
+
+class ChatRequest(BaseModel):
+    message: str
+
+
+@app.post("/api/brands/{brand_id}/chat")
+def chat_with_brand(brand_id: str, body: ChatRequest, db: Session = Depends(get_db)):
+    brand = db.query(Brand).filter(Brand.id == brand_id).first()
+    if not brand:
+        raise HTTPException(status_code=404, detail="Brand not found")
+
+    json_path = os.path.join(DATA_DIR, f"{brand_id}.json")
+    if not os.path.exists(json_path):
+        raise HTTPException(status_code=400, detail="Brand knowledge not ready")
+
+    with open(json_path, "r", encoding="utf-8") as f:
+        knowledge = json.load(f)
+
+    system_prompt = (
+        "You are a brand knowledge assistant. Answer questions about this brand based ONLY "
+        "on the provided knowledge base data. Be concise and accurate. If the data doesn't "
+        "contain the answer, say so.\n\n"
+        f"Brand Knowledge Base:\n{json.dumps(knowledge, ensure_ascii=False, indent=2)}"
+    )
+
+    try:
+        resp = httpx.post(
+            "https://api.minimax.chat/v1/text/chatcompletion_v2",
+            headers={
+                "Authorization": f"Bearer {MINIMAX_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": "MiniMax-M2.7",
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": body.message},
+                ],
+            },
+            timeout=60.0,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        answer = data.get("choices", [{}])[0].get("message", {}).get("content", "Unable to get response")
+        return {"answer": answer}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Chat error: {str(e)}")
+
+
+# --- Editable Knowledge ---
+
+@app.put("/api/brands/{brand_id}/knowledge")
+def update_knowledge(brand_id: str, request: Request, db: Session = Depends(get_db)):
+    import asyncio
+    loop = asyncio.new_event_loop()
+    body = loop.run_until_complete(request.json())
+    loop.close()
+
+    brand = db.query(Brand).filter(Brand.id == brand_id).first()
+    if not brand:
+        raise HTTPException(status_code=404, detail="Brand not found")
+
+    json_path = os.path.join(DATA_DIR, f"{brand_id}.json")
+    existing = {}
+    if os.path.exists(json_path):
+        with open(json_path, "r", encoding="utf-8") as f:
+            existing = json.load(f)
+
+    def deep_merge(base, updates):
+        for k, v in updates.items():
+            if isinstance(v, dict) and isinstance(base.get(k), dict):
+                deep_merge(base[k], v)
+            else:
+                base[k] = v
+        return base
+
+    merged = deep_merge(copy.deepcopy(existing), body)
+    with open(json_path, "w", encoding="utf-8") as f:
+        json.dump(merged, f, ensure_ascii=False, indent=2)
+
+    brand.updated_at = datetime.now(timezone.utc)
+    db.commit()
+
+    return merged
+
+
+# --- Public Knowledge ---
+
+@app.get("/api/brands/{brand_id}/public")
+def get_public_knowledge(brand_id: str, db: Session = Depends(get_db)):
+    brand = db.query(Brand).filter(Brand.id == brand_id).first()
+    if not brand:
+        raise HTTPException(status_code=404, detail="Brand not found")
+
+    json_path = os.path.join(DATA_DIR, f"{brand_id}.json")
+    if not os.path.exists(json_path):
+        raise HTTPException(status_code=400, detail="Knowledge not ready")
+
+    with open(json_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    _record_call(brand_id)
+    return {"brand_id": brand_id, "name": brand.name, "url": brand.url, "data": data}
+
+
+@app.get("/api/brands/{brand_id}/embed-config")
+def get_embed_config(brand_id: str, request: Request, db: Session = Depends(get_db)):
+    brand = db.query(Brand).filter(Brand.id == brand_id).first()
+    if not brand:
+        raise HTTPException(status_code=404, detail="Brand not found")
+
+    base = str(request.base_url).rstrip("/")
+    return {
+        "brand_id": brand_id,
+        "brand_name": brand.name,
+        "mcp_endpoint": f"{base}/mcp",
+        "api_endpoint": f"{base}/api/brands/{brand_id}",
+        "public_endpoint": f"{base}/api/brands/{brand_id}/public",
+        "instructions": [
+            "1. Use the MCP endpoint with any MCP-compatible AI client",
+            "2. Or call the API endpoint directly to get brand knowledge JSON",
+            "3. Configure your AI agent to use the brand name for lookups",
+        ],
+    }
+
+
+# --- Stats ---
+
+@app.get("/api/brands/{brand_id}/stats")
+def get_brand_stats(brand_id: str, db: Session = Depends(get_db)):
+    brand = db.query(Brand).filter(Brand.id == brand_id).first()
+    if not brand:
+        raise HTTPException(status_code=404, detail="Brand not found")
+
+    log = db.query(ApiCallLog).filter(ApiCallLog.brand_id == brand_id).first()
+    return {
+        "brand_id": brand_id,
+        "call_count": log.call_count if log else 0,
+        "last_accessed": log.last_accessed.isoformat() if log and log.last_accessed else None,
+    }
 
 
 # --- MCP Endpoint ---
