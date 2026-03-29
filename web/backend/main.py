@@ -33,7 +33,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "brands")
+DATA_DIR = os.path.join(os.path.dirname(__file__), "data", "brands")
 os.makedirs(DATA_DIR, exist_ok=True)
 
 
