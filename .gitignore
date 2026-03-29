@@ -11,3 +11,9 @@ node_modules/
 *.db
 output/
 output/*.json
+
+# Web
+web/frontend/.next/
+web/frontend/node_modules/
+web/data/
+*.db

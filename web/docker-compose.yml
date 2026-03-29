@@ -1,0 +1,42 @@
+version: "3.8"
+
+services:
+  brand2context-api:
+    build:
+      context: ..
+      dockerfile: web/backend/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - MINIMAX_API_KEY=${MINIMAX_API_KEY:-sk-cp-49r5TFMzeb7-z-HCbtIPK3h7NZPVs8QJIPVIBC9S3JDjeHq4pKU6YZ-srAyN1YH3-LR6wS0ot4f6xEcqR34SsBpE-yPuW-9kb_yGlDRaive4lhwduA3UAZs}
+      - TAVILY_API_KEY=${TAVILY_API_KEY}
+      - LINK2CONTEXT_URL=${LINK2CONTEXT_URL:-http://67.209.190.54:8000}
+      - DATABASE_URL=sqlite:///data/brand2context.db
+      - CHROMA_HOST=brand2context-chroma
+      - CHROMA_PORT=8003
+    volumes:
+      - brand-data:/app/data
+    depends_on:
+      - brand2context-chroma
+
+  brand2context-web:
+    build:
+      context: ..
+      dockerfile: web/frontend/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      - brand2context-api
+
+  brand2context-chroma:
+    image: chromadb/chroma:latest
+    ports:
+      - "8003:8000"
+    volumes:
+      - chroma-data:/chroma/chroma
+
+volumes:
+  brand-data:
+  chroma-data:
