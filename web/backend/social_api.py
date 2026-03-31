@@ -14,6 +14,7 @@ app.add_middleware(
 MEDIACRAWLER_PATH = "/opt/MediaCrawler"
 VNC_URL = os.environ.get("VNC_URL", "http://67.209.190.54:6080/vnc.html")
 VNC_URL_AUTOCONNECT = "http://67.209.190.54:6080/vnc.html?autoconnect=true&resize=scale"
+VALID_PLATFORMS = {"wb", "xhs", "dy"}
 _login_process = None
 
 
@@ -44,15 +45,31 @@ def get_social_status():
 @app.post("/api/social/login/{platform}")
 def start_social_login(platform: str):
     global _login_process
+    
+    # 验证平台参数
+    if platform not in VALID_PLATFORMS:
+        return {"status": "error", "message": f"Invalid platform: {platform}. Must be one of: {VALID_PLATFORMS}"}
+    
+    # 如果之前的进程已结束，清理掉
     if _login_process is not None:
-        return {"status": "already_running", "vnc_url": VNC_URL_AUTOCONNECT}
+        if _login_process.poll() is not None:
+            _login_process = None
+        else:
+            # 进程还在跑，先杀掉再重新启动
+            _login_process.terminate()
+            try:
+                _login_process.wait(timeout=5)
+            except:
+                _login_process.kill()
+            _login_process = None
 
     env = {
         "DISPLAY": os.environ.get("DISPLAY", ":99"),
         "PATH": os.environ.get("PATH", ""),
+        "HOME": os.environ.get("HOME", "/root"),
     }
     cmd = f"cd {MEDIACRAWLER_PATH} && /root/.local/bin/uv run python main.py --platform {platform} --type search --keywords test --headless false --get_comment false"
-    _login_process = subprocess.Popen(cmd, shell=True, env=env)
+    _login_process = subprocess.Popen(cmd, shell=True, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     return {"status": "login_started", "vnc_url": VNC_URL_AUTOCONNECT}
 
 
