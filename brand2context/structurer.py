@@ -1,4 +1,5 @@
 """Step 4: LLM structured extraction — the core of Brand2Context."""
+
 import json
 import os
 from datetime import datetime, timezone
@@ -6,9 +7,18 @@ from .llm import chat_json
 from .config import SCHEMA_PATH
 
 
-def structure_brand(url: str, pages: list[dict], clues: dict, search_results: list[dict]) -> dict:
+def structure_brand(
+    url: str,
+    pages: list[dict],
+    clues: dict,
+    search_results: list[dict],
+    social_results: list[dict] = None,
+) -> dict:
     """Combine all data and use LLM to produce final structured brand knowledge JSON."""
     print("🧠 Generating structured brand knowledge base...")
+
+    if social_results is None:
+        social_results = []
 
     # Load schema
     with open(SCHEMA_PATH) as f:
@@ -27,15 +37,28 @@ def structure_brand(url: str, pages: list[dict], clues: dict, search_results: li
         for r in sr.get("results", []):
             search_content += f"• {r['title']} ({r['url']}): {r['content'][:500]}\n"
 
+    social_content = ""
+    for sm in social_results:
+        platform = sm.get("platform", "unknown")
+        title = sm.get("title", "")
+        content = sm.get("content", "")
+        likes = sm.get("likes", 0)
+        comments = sm.get("comments", 0)
+        shares = sm.get("shares", 0)
+        social_content += f"\n=== 社交媒体数据 ===\n平台: {platform}\n标题: {title}\n内容: {content}\n互动: 点赞{likes} 评论{comments} 分享{shares}\n"
+
     clues_text = json.dumps(clues, ensure_ascii=False, indent=2)
 
     # Truncate to fit context
     max_website = 25000
     max_search = 10000
+    max_social = 8000
     if len(website_content) > max_website:
         website_content = website_content[:max_website] + "\n[...truncated...]"
     if len(search_content) > max_search:
         search_content = search_content[:max_search] + "\n[...truncated...]"
+    if len(social_content) > max_social:
+        social_content = social_content[:max_social] + "\n[...truncated...]"
 
     schema_text = json.dumps(schema, ensure_ascii=False, indent=2)
 
@@ -70,10 +93,18 @@ Based on ALL the information provided below, generate a complete JSON object tha
 ## WEB SEARCH RESULTS:
 {search_content if search_content.strip() else "(No search results available)"}
 
+## SOCIAL MEDIA DATA (社交媒体数据):
+{social_content if social_content.strip() else "(No social media data available)"}
+注意：社交媒体数据对于填充 campaigns（品牌活动）、perception（公众认知）、trust（信任信号）维度特别有用。
+
 Generate the complete brand knowledge JSON now:"""
 
     try:
-        result = chat_json(prompt, system="You are a brand intelligence analyst. Output ONLY valid JSON matching the schema. Be thorough and precise. 请用中文填写所有字段内容。品牌名称、专有名词可保留英文原文。", max_tokens=16000)
+        result = chat_json(
+            prompt,
+            system="You are a brand intelligence analyst. Output ONLY valid JSON matching the schema. Be thorough and precise. 请用中文填写所有字段内容。品牌名称、专有名词可保留英文原文。",
+            max_tokens=16000,
+        )
         # Ensure required fields
         result["schema_version"] = "0.3.0"
         result["generated_at"] = datetime.now(timezone.utc).isoformat()

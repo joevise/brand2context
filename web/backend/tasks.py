@@ -1,4 +1,5 @@
 """Background task runner for brand knowledge generation."""
+
 import json
 import os
 import sys
@@ -41,6 +42,11 @@ def run_brand_pipeline(brand_id: str, url: str):
         # Step 3: Web search expansion
         search_results = search_expand(clues)
 
+        # Step 3.5: Social media crawl
+        from brand2context.social_crawler import crawl_social_media
+
+        social_results = crawl_social_media(clues.get("brand_name", ""))
+
         # Step 4: Structure
         if not pages and not search_results:
             brand.status = "error"
@@ -49,7 +55,7 @@ def run_brand_pipeline(brand_id: str, url: str):
             db.commit()
             return
 
-        result = structure_brand(url, pages, clues, search_results)
+        result = structure_brand(url, pages, clues, search_results, social_results)
 
         # Save JSON
         output_path = os.path.join(DATA_DIR, f"{brand_id}.json")
@@ -66,6 +72,7 @@ def run_brand_pipeline(brand_id: str, url: str):
         # Index in ChromaDB
         try:
             from vector import index_brand
+
             index_brand(brand_id, result)
         except Exception as e:
             print(f"Warning: ChromaDB indexing failed: {e}")
