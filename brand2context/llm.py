@@ -44,4 +44,27 @@ def chat_json(prompt: str, system: str = "", max_tokens: int = 16000) -> dict:
         text = text.split("```json", 1)[1].split("```", 1)[0]
     elif "```" in text:
         text = text.split("```", 1)[1].split("```", 1)[0]
-    return json.loads(text.strip())
+    
+    text = text.strip()
+    
+    # 尝试直接解析
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+    
+    # 尝试修复常见 JSON 问题
+    import re
+    # 修复尾随逗号
+    fixed = re.sub(r',\s*([}\]])', r'\1', text)
+    # 修复缺少逗号（行尾的 " 后面紧跟换行和 "）
+    fixed = re.sub(r'"\s*\n\s*"', '",\n"', fixed)
+    # 修复缺少逗号（} 或 ] 后面紧跟换行和 "）
+    fixed = re.sub(r'([}\]])\s*\n\s*"', r'\1,\n"', fixed)
+    
+    try:
+        return json.loads(fixed)
+    except json.JSONDecodeError as e:
+        print(f"   ⚠️ JSON 修复失败，原始错误: {e}")
+        print(f"   ⚠️ 原始文本前500字符: {text[:500]}")
+        raise
