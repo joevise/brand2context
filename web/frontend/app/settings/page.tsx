@@ -33,9 +33,10 @@ const SOCIAL_API_URL = "http://67.209.190.54:8006";
 const platformToApi: Record<Platform, string> = { weibo: "wb", xiaohongshu: "xhs", douyin: "dy" };
 
 function LoginModal({ platform, onClose, onComplete }: LoginModalProps) {
-  const [vncUrl, setVncUrl] = useState<string | null>(null);
+  const [qrcodeUrl, setQrcodeUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [loginSuccess, setLoginSuccess] = useState(false);
 
   useEffect(() => {
     const openLogin = async () => {
@@ -43,7 +44,11 @@ function LoginModal({ platform, onClose, onComplete }: LoginModalProps) {
         const res = await fetch(`${SOCIAL_API_URL}/api/social/login/${platformToApi[platform]}`, { method: "POST" });
         if (!res.ok) throw new Error("Failed to get login URL");
         const data = await res.json();
-        setVncUrl(data.vnc_url);
+        if (data.status === "qrcode_ready") {
+          setQrcodeUrl(data.qrcode);
+        } else {
+          setError(data.message || "Failed to get QR code");
+        }
       } catch (err) {
         setError("无法打开登录窗口");
       } finally {
@@ -53,53 +58,76 @@ function LoginModal({ platform, onClose, onComplete }: LoginModalProps) {
     openLogin();
   }, [platform]);
 
-  const handleComplete = async () => {
-    await fetch(`${SOCIAL_API_URL}/api/social/status`);
-    onComplete();
+  useEffect(() => {
+    if (!qrcodeUrl) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`${SOCIAL_API_URL}/api/social/login/${platformToApi[platform]}/check`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.logged_in) {
+            setLoginSuccess(true);
+            clearInterval(interval);
+            setTimeout(() => {
+              onComplete();
+            }, 3000);
+          }
+        }
+      } catch {}
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [qrcodeUrl, platform, onComplete]);
+
+  const handleCancel = async () => {
+    try {
+      await fetch(`${SOCIAL_API_URL}/api/social/login/${platformToApi[platform]}/cancel`, { method: "POST" });
+    } catch {}
+    onClose();
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="relative bg-[var(--card)] rounded-xl shadow-2xl w-[1280px] max-w-[95vw]">
+      <div className="absolute inset-0 bg-black/60" onClick={handleCancel} />
+      <div className="relative bg-[var(--card)] rounded-xl shadow-2xl w-[400px] max-w-[95vw]">
         <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
           <h2 className="text-lg font-semibold">登录 {platformConfig[platform].name}</h2>
-          <div className="flex gap-2">
-            <button
-              onClick={handleComplete}
-              className="px-4 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 text-white font-medium transition"
-            >
-              完成登录
-            </button>
-            <button
-              onClick={onClose}
-              className="px-4 py-2 rounded-lg bg-[var(--muted)] hover:bg-[var(--muted-foreground)]/20 font-medium transition"
-            >
-              关闭
-            </button>
-          </div>
+          <button
+            onClick={handleCancel}
+            className="px-4 py-2 rounded-lg bg-[var(--muted)] hover:bg-[var(--muted-foreground)]/20 font-medium transition"
+          >
+            关闭
+          </button>
         </div>
-        <div className="p-4">
+        <div className="p-6 flex flex-col items-center">
           {loading && (
-            <div className="flex items-center justify-center h-[720px]">
+            <div className="flex items-center justify-center h-[300px]">
               <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
             </div>
           )}
           {error && (
-            <div className="flex items-center justify-center h-[720px] text-red-500">
+            <div className="flex items-center justify-center h-[300px] text-red-500">
               {error}
             </div>
           )}
-          {vncUrl && !loading && (
-            <iframe 
-              src={vncUrl} 
-              width="100%" 
-              height="720" 
-              className="rounded-lg border border-[var(--border)]"
-              style={{maxWidth: "1280px"}}
-              allow="clipboard-read; clipboard-write"
-              sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
-            />
+          {loginSuccess && (
+            <div className="flex flex-col items-center justify-center h-[300px] text-green-500">
+              <CheckCircle className="w-16 h-16 mb-4" />
+              <p className="text-lg font-medium">登录成功</p>
+            </div>
+          )}
+          {qrcodeUrl && !loading && !loginSuccess && (
+            <>
+              <p className="text-sm text-[var(--muted-foreground)] mb-4">请使用手机扫描二维码登录</p>
+              <div className="bg-white p-4 rounded-lg">
+                <img
+                  src={qrcodeUrl}
+                  alt="QR Code"
+                  className="w-[300px] h-[300px] object-contain"
+                />
+              </div>
+            </>
           )}
         </div>
       </div>
@@ -117,7 +145,6 @@ export default function SettingsPage() {
       const res = await fetch(`${SOCIAL_API_URL}/api/social/status`);
       if (res.ok) {
         const data = await res.json();
-        // API 返回 wb/xhs/dy，前端用 weibo/xiaohongshu/douyin
         const platformMap: Record<string, Platform> = { wb: "weibo", xhs: "xiaohongshu", dy: "douyin" };
         const mapped: SocialStatus = { weibo: "disconnected", xiaohongshu: "disconnected", douyin: "disconnected" };
         for (const [key, info] of Object.entries(data.platforms || {})) {
