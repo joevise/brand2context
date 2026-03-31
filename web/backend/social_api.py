@@ -49,12 +49,13 @@ def get_social_status():
 
 
 def _check_login_cookie(db_path: str, cookie_name: str, host_pattern: str) -> bool:
+    """检查登录 cookie 是否有效（空值加密约51字节，真正的登录token加密后>100字节）"""
     if not os.path.exists(db_path):
         return False
     try:
         db = sqlite3.connect(db_path)
         cursor = db.execute(
-            f"SELECT value, encrypted_value FROM cookies WHERE name=? AND host_key LIKE ?",
+            "SELECT value, encrypted_value FROM cookies WHERE name=? AND host_key LIKE ?",
             (cookie_name, host_pattern),
         )
         row = cursor.fetchone()
@@ -62,9 +63,11 @@ def _check_login_cookie(db_path: str, cookie_name: str, host_pattern: str) -> bo
         if row is None:
             return False
         value, encrypted_value = row
-        return bool(value) or (
-            encrypted_value is not None and len(encrypted_value) > 10
-        )
+        if value and len(value) > 5:
+            return True
+        if encrypted_value and len(encrypted_value) > 100:
+            return True
+        return False
     except Exception:
         return False
 
