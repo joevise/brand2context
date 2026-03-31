@@ -100,7 +100,8 @@ def _crawl_single_platform(platform: str, brand_name: str) -> list[dict]:
         "1",
     ]
 
-    cmd_str = f'cd {MEDIACRAWLER_PATH} && uv run python main.py --platform {platform} --type search --keywords "{brand_name}" --headless true --get_comment false --save_data_option jsonl --max_concurrency_num 1'
+    uv_path = os.environ.get("UV_PATH", "/root/.local/bin/uv")
+    cmd_str = f'cd {MEDIACRAWLER_PATH} && {uv_path} run python main.py --platform {platform} --type search --keywords "{brand_name}" --headless true --get_comment false --save_data_option jsonl --max_concurrency_num 1'
 
     try:
         result = subprocess.run(

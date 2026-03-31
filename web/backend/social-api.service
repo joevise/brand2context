@@ -7,6 +7,8 @@ Type=simple
 WorkingDirectory=/opt/brand2context/web/backend
 ExecStart=/usr/bin/python3 -m uvicorn social_api:app --host 0.0.0.0 --port 8006
 Environment=DISPLAY=:99
+Environment=PATH=/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=HOME=/root
 Restart=always
 
 [Install]
