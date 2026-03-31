@@ -29,6 +29,8 @@ const statusConfig = {
   not_required: { icon: MinusCircle, color: "text-gray-500", bg: "bg-gray-100 dark:bg-gray-900/30", label: "无需登录" },
 };
 
+const SOCIAL_API_URL = "http://67.209.190.54:8006";
+
 function LoginModal({ platform, onClose, onComplete }: LoginModalProps) {
   const [vncUrl, setVncUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -37,7 +39,7 @@ function LoginModal({ platform, onClose, onComplete }: LoginModalProps) {
   useEffect(() => {
     const openLogin = async () => {
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/social/login/${platform}`, { method: "POST" });
+        const res = await fetch(`${SOCIAL_API_URL}/api/social/login/${platform}`, { method: "POST" });
         if (!res.ok) throw new Error("Failed to get login URL");
         const data = await res.json();
         setVncUrl(data.vnc_url);
@@ -51,7 +53,7 @@ function LoginModal({ platform, onClose, onComplete }: LoginModalProps) {
   }, [platform]);
 
   const handleComplete = async () => {
-    await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/social/status`);
+    await fetch(`${SOCIAL_API_URL}/api/social/status`);
     onComplete();
   };
 
@@ -103,7 +105,7 @@ export default function SettingsPage() {
 
   const loadStatus = async () => {
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/social/status`);
+      const res = await fetch(`${SOCIAL_API_URL}/api/social/status`);
       if (res.ok) {
         const data = await res.json();
         setStatus(data);

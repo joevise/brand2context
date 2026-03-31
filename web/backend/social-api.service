@@ -1,0 +1,13 @@
+[Unit]
+Description=Brand2Context Social Media API
+After=mediacrawler-vnc.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/brand2context/web/backend
+ExecStart=/usr/bin/python3 -m uvicorn social_api:app --host 0.0.0.0 --port 8006
+Environment=DISPLAY=:99
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

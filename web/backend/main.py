@@ -5,7 +5,6 @@ import os
 import uuid
 import threading
 import copy
-import subprocess
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -25,10 +24,6 @@ MINIMAX_API_KEY = os.getenv(
     "sk-cp-49r5TFMzeb7-z-HCbtIPK3h7NZPVs8QJIPVIBC9S3JDjeHq4pKU6YZ-srAyN1YH3-LR6wS0ot4f6xEcqR34SsBpE-yPuW-9kb_yGlDRaive4lhwduA3UAZs",
 )
 
-VNC_URL = "http://67.209.190.54:6080/vnc.html"
-VNC_URL_AUTOCONNECT = "http://67.209.190.54:6080/vnc.html?autoconnect=true&resize=scale"
-
-_login_process = None
 
 app = FastAPI(title="Brand2Context API", version="0.1.0")
 
@@ -408,53 +403,6 @@ async def mcp_endpoint(request: Request):
 @app.get("/health")
 def health():
     return {"status": "ok", "service": "brand2context-api"}
-
-
-# --- Social Login APIs ---
-
-
-@app.get("/api/social/status")
-def get_social_status():
-    platforms = {
-        "wb": {"name": "微博", "logged_in": True, "login_required": False},
-        "xhs": {"name": "小红书", "logged_in": False, "login_required": True},
-        "dy": {"name": "抖音", "logged_in": False, "login_required": True},
-    }
-    xhs_cookie_path = "/opt/MediaCrawler/browser_data/xhs_user_data_dir/Default/Cookies"
-    dy_cookie_path = "/opt/MediaCrawler/browser_data/dy_user_data_dir/Default/Cookies"
-
-    if os.path.exists(xhs_cookie_path) and os.path.getsize(xhs_cookie_path) > 10240:
-        platforms["xhs"]["logged_in"] = True
-        platforms["xhs"]["login_required"] = False
-    if os.path.exists(dy_cookie_path) and os.path.getsize(dy_cookie_path) > 10240:
-        platforms["dy"]["logged_in"] = True
-        platforms["dy"]["login_required"] = False
-
-    return {"platforms": platforms, "vnc_url": VNC_URL}
-
-
-@app.post("/api/social/login/{platform}")
-def start_social_login(platform: str):
-    global _login_process
-    if _login_process is not None:
-        return {"status": "already_running", "vnc_url": VNC_URL_AUTOCONNECT}
-
-    env = {
-        "DISPLAY": os.environ.get("DISPLAY", ":99"),
-        "PATH": os.environ.get("PATH", ""),
-    }
-    cmd = f"cd /opt/MediaCrawler && /root/.local/bin/uv run python main.py --platform {platform} --type search --keywords test --headless false --get_comment false"
-    _login_process = subprocess.Popen(cmd, shell=True, env=env)
-    return {"status": "login_started", "vnc_url": VNC_URL_AUTOCONNECT}
-
-
-@app.post("/api/social/login/{platform}/cancel")
-def cancel_social_login(platform: str):
-    global _login_process
-    if _login_process is not None:
-        _login_process.terminate()
-        _login_process = None
-    return {"status": "cancelled"}
 
 
 if __name__ == "__main__":
