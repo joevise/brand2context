@@ -17,6 +17,9 @@ export function Navbar() {
           <Link href="/brands" className="text-sm font-medium hover:text-primary-600 transition">
             Brands
           </Link>
+          <Link href="/settings" className="text-sm font-medium hover:text-primary-600 transition">
+            设置
+          </Link>
           <button
             onClick={toggle}
             className="p-2 rounded-lg hover:bg-[var(--muted)] transition"

@@ -67,8 +67,9 @@ def _crawl_single_platform(platform: str, brand_name: str) -> list[dict]:
         该平台的数据列表
     """
     env = os.environ.copy()
-    env["DISPLAY"] = ":0"
-    env["XAUTHORITY"] = "/run/user/1000/.mutter-Xwaylandauth.CMO3M3"
+    env["DISPLAY"] = os.environ.get("DISPLAY", ":99")
+    if "XAUTHORITY" in env:
+        del env["XAUTHORITY"]
 
     cmd = [
         "cd",

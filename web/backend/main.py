@@ -1,9 +1,11 @@
 """Brand2Context FastAPI application."""
+
 import json
 import os
 import uuid
 import threading
 import copy
+import subprocess
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -22,6 +24,11 @@ MINIMAX_API_KEY = os.getenv(
     "MINIMAX_API_KEY",
     "sk-cp-49r5TFMzeb7-z-HCbtIPK3h7NZPVs8QJIPVIBC9S3JDjeHq4pKU6YZ-srAyN1YH3-LR6wS0ot4f6xEcqR34SsBpE-yPuW-9kb_yGlDRaive4lhwduA3UAZs",
 )
+
+VNC_URL = "http://67.209.190.54:6080/vnc.html"
+VNC_URL_AUTOCONNECT = "http://67.209.190.54:6080/vnc.html?autoconnect=true&resize=scale"
+
+_login_process = None
 
 app = FastAPI(title="Brand2Context API", version="0.1.0")
 
@@ -45,8 +52,10 @@ def startup():
 
 # --- Pydantic schemas ---
 
+
 class BrandCreate(BaseModel):
     url: str
+
 
 class BrandResponse(BaseModel):
     id: str
@@ -75,6 +84,7 @@ def brand_to_response(b: Brand) -> dict:
 
 # --- API Endpoints ---
 
+
 @app.post("/api/brands")
 def create_brand(body: BrandCreate, db: Session = Depends(get_db)):
     url = body.url
@@ -88,7 +98,9 @@ def create_brand(body: BrandCreate, db: Session = Depends(get_db)):
     db.refresh(brand)
 
     # Start background task
-    thread = threading.Thread(target=run_brand_pipeline, args=(brand_id, url), daemon=True)
+    thread = threading.Thread(
+        target=run_brand_pipeline, args=(brand_id, url), daemon=True
+    )
     thread.start()
 
     return brand_to_response(brand)
@@ -137,6 +149,7 @@ def delete_brand(brand_id: str, db: Session = Depends(get_db)):
     # Delete vector index
     try:
         from vector import delete_brand_index
+
         delete_brand_index(brand_id)
     except Exception:
         pass
@@ -149,7 +162,11 @@ def get_brand_status(brand_id: str, db: Session = Depends(get_db)):
     brand = db.query(Brand).filter(Brand.id == brand_id).first()
     if not brand:
         raise HTTPException(status_code=404, detail="Brand not found")
-    return {"id": brand.id, "status": brand.status, "error_message": brand.error_message}
+    return {
+        "id": brand.id,
+        "status": brand.status,
+        "error_message": brand.error_message,
+    }
 
 
 @app.get("/api/brands/{brand_id}/search")
@@ -163,6 +180,7 @@ def search_brand_endpoint(brand_id: str, q: str = "", db: Session = Depends(get_
 
     try:
         from vector import search_brand
+
         results = search_brand(brand_id, q)
         if results:
             docs = results.get("documents", [[]])[0]
@@ -179,6 +197,7 @@ def search_brand_endpoint(brand_id: str, q: str = "", db: Session = Depends(get_
 
 
 # --- Helper: record API call ---
+
 
 def _record_call(brand_id: str):
     """Increment API call counter for a brand."""
@@ -198,6 +217,7 @@ def _record_call(brand_id: str):
 
 
 # --- Chat Endpoint ---
+
 
 class ChatRequest(BaseModel):
     message: str
@@ -220,8 +240,13 @@ def chat_with_brand(brand_id: str, body: ChatRequest, db: Session = Depends(get_
     context_text = None
     try:
         from vector import search_brand
+
         vector_results = search_brand(brand_id, body.message, n_results=5)
-        if vector_results and vector_results.get("documents") and vector_results["documents"][0]:
+        if (
+            vector_results
+            and vector_results.get("documents")
+            and vector_results["documents"][0]
+        ):
             chunks = vector_results["documents"][0]
             # Always include identity context
             identity = knowledge.get("identity", {})
@@ -258,7 +283,11 @@ def chat_with_brand(brand_id: str, body: ChatRequest, db: Session = Depends(get_
         )
         resp.raise_for_status()
         data = resp.json()
-        answer = data.get("choices", [{}])[0].get("message", {}).get("content", "Unable to get response")
+        answer = (
+            data.get("choices", [{}])[0]
+            .get("message", {})
+            .get("content", "Unable to get response")
+        )
         return {"answer": answer}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Chat error: {str(e)}")
@@ -266,9 +295,11 @@ def chat_with_brand(brand_id: str, body: ChatRequest, db: Session = Depends(get_
 
 # --- Editable Knowledge ---
 
+
 @app.put("/api/brands/{brand_id}/knowledge")
 def update_knowledge(brand_id: str, request: Request, db: Session = Depends(get_db)):
     import asyncio
+
     loop = asyncio.new_event_loop()
     body = loop.run_until_complete(request.json())
     loop.close()
@@ -302,6 +333,7 @@ def update_knowledge(brand_id: str, request: Request, db: Session = Depends(get_
 
 
 # --- Public Knowledge ---
+
 
 @app.get("/api/brands/{brand_id}/public")
 def get_public_knowledge(brand_id: str, db: Session = Depends(get_db)):
@@ -343,6 +375,7 @@ def get_embed_config(brand_id: str, request: Request, db: Session = Depends(get_
 
 # --- Stats ---
 
+
 @app.get("/api/brands/{brand_id}/stats")
 def get_brand_stats(brand_id: str, db: Session = Depends(get_db)):
     brand = db.query(Brand).filter(Brand.id == brand_id).first()
@@ -353,11 +386,14 @@ def get_brand_stats(brand_id: str, db: Session = Depends(get_db)):
     return {
         "brand_id": brand_id,
         "call_count": log.call_count if log else 0,
-        "last_accessed": log.last_accessed.isoformat() if log and log.last_accessed else None,
+        "last_accessed": log.last_accessed.isoformat()
+        if log and log.last_accessed
+        else None,
     }
 
 
 # --- MCP Endpoint ---
+
 
 @app.post("/mcp")
 async def mcp_endpoint(request: Request):
@@ -368,11 +404,60 @@ async def mcp_endpoint(request: Request):
 
 # --- Health ---
 
+
 @app.get("/health")
 def health():
     return {"status": "ok", "service": "brand2context-api"}
 
 
+# --- Social Login APIs ---
+
+
+@app.get("/api/social/status")
+def get_social_status():
+    platforms = {
+        "wb": {"name": "微博", "logged_in": True, "login_required": False},
+        "xhs": {"name": "小红书", "logged_in": False, "login_required": True},
+        "dy": {"name": "抖音", "logged_in": False, "login_required": True},
+    }
+    xhs_cookie_path = "/opt/MediaCrawler/browser_data/xhs_user_data_dir/Default/Cookies"
+    dy_cookie_path = "/opt/MediaCrawler/browser_data/dy_user_data_dir/Default/Cookies"
+
+    if os.path.exists(xhs_cookie_path) and os.path.getsize(xhs_cookie_path) > 10240:
+        platforms["xhs"]["logged_in"] = True
+        platforms["xhs"]["login_required"] = False
+    if os.path.exists(dy_cookie_path) and os.path.getsize(dy_cookie_path) > 10240:
+        platforms["dy"]["logged_in"] = True
+        platforms["dy"]["login_required"] = False
+
+    return {"platforms": platforms, "vnc_url": VNC_URL}
+
+
+@app.post("/api/social/login/{platform}")
+def start_social_login(platform: str):
+    global _login_process
+    if _login_process is not None:
+        return {"status": "already_running", "vnc_url": VNC_URL_AUTOCONNECT}
+
+    env = {
+        "DISPLAY": os.environ.get("DISPLAY", ":99"),
+        "PATH": os.environ.get("PATH", ""),
+    }
+    cmd = f"cd /opt/MediaCrawler && /root/.local/bin/uv run python main.py --platform {platform} --type search --keywords test --headless false --get_comment false"
+    _login_process = subprocess.Popen(cmd, shell=True, env=env)
+    return {"status": "login_started", "vnc_url": VNC_URL_AUTOCONNECT}
+
+
+@app.post("/api/social/login/{platform}/cancel")
+def cancel_social_login(platform: str):
+    global _login_process
+    if _login_process is not None:
+        _login_process.terminate()
+        _login_process = None
+    return {"status": "cancelled"}
+
+
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)
