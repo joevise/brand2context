@@ -14,6 +14,6 @@ SCHEMA_PATH = os.path.join(
     os.path.dirname(os.path.dirname(__file__)), "schema", "brand_knowledge.schema.json"
 )
 OUTPUT_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "output")
-MEDIACRAWLER_PATH = os.getenv("MEDIACRAWLER_PATH", "/home/elttilz/MediaCrawler")
+MEDIACRAWLER_PATH = os.getenv("MEDIACRAWLER_PATH", "/opt/MediaCrawler")
 SOCIAL_PLATFORMS = ["wb", "xhs", "dy"]
 SOCIAL_CRAWL_TIMEOUT = 120

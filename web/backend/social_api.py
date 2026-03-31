@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import subprocess
-import signal
+import sqlite3
 
 app = FastAPI(title="Brand2Context Social API")
 app.add_middleware(
@@ -25,21 +25,45 @@ def get_social_status():
         "xhs": {"name": "小红书", "logged_in": False, "login_required": True},
         "dy": {"name": "抖音", "logged_in": False, "login_required": True},
     }
-    xhs_cookie_path = (
-        f"{MEDIACRAWLER_PATH}/browser_data/xhs_user_data_dir/Default/Cookies"
+    
+    # 检查小红书：查数据库里有没有 web_session cookie
+    platforms["xhs"]["logged_in"] = _check_login_cookie(
+        f"{MEDIACRAWLER_PATH}/browser_data/xhs_user_data_dir/Default/Cookies",
+        "web_session", "%xiaohongshu%"
     )
-    dy_cookie_path = (
-        f"{MEDIACRAWLER_PATH}/browser_data/dy_user_data_dir/Default/Cookies"
-    )
-
-    if os.path.exists(xhs_cookie_path) and os.path.getsize(xhs_cookie_path) > 10240:
-        platforms["xhs"]["logged_in"] = True
+    if platforms["xhs"]["logged_in"]:
         platforms["xhs"]["login_required"] = False
-    if os.path.exists(dy_cookie_path) and os.path.getsize(dy_cookie_path) > 10240:
-        platforms["dy"]["logged_in"] = True
+    
+    # 检查抖音：查数据库里有没有 sessionid cookie
+    platforms["dy"]["logged_in"] = _check_login_cookie(
+        f"{MEDIACRAWLER_PATH}/browser_data/dy_user_data_dir/Default/Cookies",
+        "sessionid", "%douyin%"
+    )
+    if platforms["dy"]["logged_in"]:
         platforms["dy"]["login_required"] = False
 
     return {"platforms": platforms, "vnc_url": VNC_URL}
+
+
+def _check_login_cookie(db_path: str, cookie_name: str, host_pattern: str) -> bool:
+    """检查 Chromium cookie 数据库里是否有指定的登录 cookie 且 value 非空"""
+    if not os.path.exists(db_path):
+        return False
+    try:
+        db = sqlite3.connect(db_path)
+        cursor = db.execute(
+            f"SELECT value, encrypted_value FROM cookies WHERE name=? AND host_key LIKE ?",
+            (cookie_name, host_pattern)
+        )
+        row = cursor.fetchone()
+        db.close()
+        if row is None:
+            return False
+        value, encrypted_value = row
+        # Chromium 加密后 value 为空，encrypted_value 非空
+        return bool(value) or (encrypted_value is not None and len(encrypted_value) > 10)
+    except Exception:
+        return False
 
 
 @app.post("/api/social/login/{platform}")

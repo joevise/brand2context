@@ -27,6 +27,12 @@ def chat(prompt: str, system: str = "", max_tokens: int = 16000, temperature: fl
     )
     resp.raise_for_status()
     data = resp.json()
+    
+    # 调试：如果 choices 为空，打印完整响应
+    if not data.get("choices"):
+        print(f"   ⚠️ LLM API 响应异常: {json.dumps(data, ensure_ascii=False)[:500]}")
+        raise ValueError(f"LLM API returned no choices: {data.get('base_resp', {}).get('status_msg', 'unknown error')}")
+    
     return data["choices"][0]["message"]["content"]
 
 

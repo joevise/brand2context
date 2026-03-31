@@ -31,6 +31,11 @@ def crawl_social_media(
     if platforms is None:
         platforms = SOCIAL_PLATFORMS
 
+    # 检查 MediaCrawler 是否存在
+    if not os.path.exists(MEDIACRAWLER_PATH):
+        print(f"⏭️ 跳过社交媒体抓取（MediaCrawler 不存在: {MEDIACRAWLER_PATH}）")
+        return []
+
     print(f"📱 开始社交媒体抓取，品牌: {brand_name}，平台: {platforms}")
 
     all_results = []
