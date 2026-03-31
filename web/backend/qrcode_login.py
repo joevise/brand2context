@@ -60,19 +60,10 @@ async def get_qrcode_base64(page, config):
     elif qrcode_type == "canvas":
         locator = page.locator(selector)
         await locator.wait_for(timeout=30000)
-        await locator.screenshot(type="png")
-        canvas = await locator.bounding_box()
-        if canvas:
-            clip = {
-                "x": canvas["x"],
-                "y": canvas["y"],
-                "width": canvas["width"],
-                "height": canvas["height"],
-            }
-            screenshot_bytes = await page.context.screenshot(clip=clip)
-            return (
-                f"data:image/png;base64,{base64.b64encode(screenshot_bytes).decode()}"
-            )
+        # 直接对 canvas 元素截图
+        screenshot_bytes = await locator.screenshot(type="png")
+        if screenshot_bytes:
+            return f"data:image/png;base64,{base64.b64encode(screenshot_bytes).decode()}"
 
     return None
 
@@ -108,22 +99,25 @@ async def main(platform: str):
         page = context.pages[0] if context.pages else await context.new_page()
 
         await page.goto(config["url"], wait_until="networkidle", timeout=60000)
+        print(json.dumps({"status": "page_loaded", "title": await page.title()}), flush=True)
 
         if config["login_button"]:
             try:
                 login_btn = page.locator(config["login_button"])
-                await login_btn.click(timeout=5000)
-                await page.wait_for_timeout(2000)
-            except Exception:
-                pass
+                await login_btn.click(timeout=10000)
+                await page.wait_for_timeout(3000)
+                print(json.dumps({"status": "login_button_clicked"}), flush=True)
+            except Exception as e:
+                print(json.dumps({"status": "login_button_failed", "error": str(e)[:200]}), flush=True)
 
         qrcode_b64 = await get_qrcode_base64(page, config)
         if qrcode_b64:
             print(json.dumps({"status": "qrcode_ready", "qrcode": qrcode_b64}))
         else:
-            print(
-                json.dumps({"status": "error", "message": "Failed to capture QR code"})
-            )
+            # 尝试整个页面截图作为 fallback
+            page_screenshot = await page.screenshot(type="png")
+            fallback_b64 = f"data:image/png;base64,{base64.b64encode(page_screenshot).decode()}"
+            print(json.dumps({"status": "qrcode_ready", "qrcode": fallback_b64, "fallback": True}))
         sys.stdout.flush()
 
         while True:

@@ -114,11 +114,25 @@ def start_social_login(platform: str):
     _qrcode_start_time[platform] = time.time()
 
     try:
-        line = _qrcode_process[platform].stdout.readline()
-        if line:
-            result = json.loads(line)
+        # 读取多行输出，直到拿到 qrcode_ready 或 error
+        import select
+        result = None
+        deadline = time.time() + 60  # 最多等 60 秒
+        while time.time() < deadline:
+            line = _qrcode_process[platform].stdout.readline()
+            if not line:
+                break
+            try:
+                data = json.loads(line)
+                if data.get("status") in ("qrcode_ready", "error"):
+                    result = data
+                    break
+            except json.JSONDecodeError:
+                continue
+        
+        if result:
             return result
-        return {"status": "error", "message": "Failed to start QR code login"}
+        return {"status": "error", "message": "Timeout waiting for QR code"}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
