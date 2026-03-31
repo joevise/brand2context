@@ -111,6 +111,19 @@ def health():
     return {"status": "ok", "service": "brand2context-social-api"}
 
 
+# --- Social Crawl API（供 Docker 容器内的 brand2context 调用） ---
+
+@app.post("/api/social/crawl/{brand_name}")
+def crawl_social(brand_name: str):
+    """抓取社交媒体数据，返回统一格式结果"""
+    import sys
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
+    
+    from brand2context.social_crawler import crawl_social_media
+    results = crawl_social_media(brand_name)
+    return {"results": results, "count": len(results)}
+
+
 if __name__ == "__main__":
     import uvicorn
 

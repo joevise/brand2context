@@ -42,10 +42,22 @@ def run_brand_pipeline(brand_id: str, url: str):
         # Step 3: Web search expansion
         search_results = search_expand(clues)
 
-        # Step 3.5: Social media crawl
-        from brand2context.social_crawler import crawl_social_media
-
-        social_results = crawl_social_media(clues.get("brand_name", ""))
+        # Step 3.5: Social media crawl (通过 HTTP 调用容器外的 social API)
+        social_results = []
+        brand_name_for_social = clues.get("brand_name", "")
+        if brand_name_for_social:
+            try:
+                import httpx
+                social_api_url = os.getenv("SOCIAL_API_URL", "http://host.docker.internal:8006")
+                resp = httpx.post(f"{social_api_url}/api/social/crawl/{brand_name_for_social}", timeout=300)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    social_results = data.get("results", [])
+                    print(f"📱 社交媒体抓取完成，获得 {len(social_results)} 条数据")
+                else:
+                    print(f"⚠️ 社交媒体 API 返回 {resp.status_code}")
+            except Exception as e:
+                print(f"⚠️ 社交媒体抓取跳过: {e}")
 
         # Step 4: Structure
         if not pages and not search_results:
