@@ -12,8 +12,8 @@ app.add_middleware(
 )
 
 MEDIACRAWLER_PATH = "/opt/MediaCrawler"
-VNC_URL = os.environ.get("VNC_URL", "http://67.209.190.54:6080/vnc.html")
-VNC_URL_AUTOCONNECT = "http://67.209.190.54:6080/vnc.html?autoconnect=true&resize=scale"
+VNC_URL = os.environ.get("VNC_URL", "http://67.209.190.54:6080/vnc_lite.html")
+VNC_URL_AUTOCONNECT = "http://67.209.190.54:6080/vnc_lite.html?autoconnect=true&resize=scale&reconnect=true"
 VALID_PLATFORMS = {"wb", "xhs", "dy"}
 _login_process = None
 

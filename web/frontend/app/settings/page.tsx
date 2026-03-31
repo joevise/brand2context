@@ -91,7 +91,15 @@ function LoginModal({ platform, onClose, onComplete }: LoginModalProps) {
             </div>
           )}
           {vncUrl && !loading && (
-            <iframe src={vncUrl} width="1280" height="720" className="rounded-lg" />
+            <iframe 
+              src={vncUrl} 
+              width="100%" 
+              height="720" 
+              className="rounded-lg border border-[var(--border)]"
+              style={{maxWidth: "1280px"}}
+              allow="clipboard-read; clipboard-write"
+              sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+            />
           )}
         </div>
       </div>
