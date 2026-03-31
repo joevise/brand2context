@@ -30,6 +30,7 @@ const statusConfig = {
 };
 
 const SOCIAL_API_URL = "http://67.209.190.54:8006";
+const platformToApi: Record<Platform, string> = { weibo: "wb", xiaohongshu: "xhs", douyin: "dy" };
 
 function LoginModal({ platform, onClose, onComplete }: LoginModalProps) {
   const [vncUrl, setVncUrl] = useState<string | null>(null);
@@ -39,7 +40,7 @@ function LoginModal({ platform, onClose, onComplete }: LoginModalProps) {
   useEffect(() => {
     const openLogin = async () => {
       try {
-        const res = await fetch(`${SOCIAL_API_URL}/api/social/login/${platform}`, { method: "POST" });
+        const res = await fetch(`${SOCIAL_API_URL}/api/social/login/${platformToApi[platform]}`, { method: "POST" });
         if (!res.ok) throw new Error("Failed to get login URL");
         const data = await res.json();
         setVncUrl(data.vnc_url);
@@ -108,7 +109,17 @@ export default function SettingsPage() {
       const res = await fetch(`${SOCIAL_API_URL}/api/social/status`);
       if (res.ok) {
         const data = await res.json();
-        setStatus(data);
+        // API 返回 wb/xhs/dy，前端用 weibo/xiaohongshu/douyin
+        const platformMap: Record<string, Platform> = { wb: "weibo", xhs: "xiaohongshu", dy: "douyin" };
+        const mapped: SocialStatus = { weibo: "disconnected", xiaohongshu: "disconnected", douyin: "disconnected" };
+        for (const [key, info] of Object.entries(data.platforms || {})) {
+          const p = platformMap[key];
+          if (!p) continue;
+          const i = info as any;
+          if (!i.login_required) mapped[p] = i.logged_in ? "connected" : "not_required";
+          else mapped[p] = i.logged_in ? "connected" : "disconnected";
+        }
+        setStatus(mapped);
       }
     } catch {}
     setLoading(false);
