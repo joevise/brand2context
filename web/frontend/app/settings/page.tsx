@@ -204,19 +204,32 @@ export default function SettingsPage() {
                   {s.label}
                 </span>
               </div>
-              <button
-                onClick={() => handleLogin(platform)}
-                disabled={isConnected || status?.[platform] === "not_required"}
-                className={`px-4 py-2 rounded-lg font-medium transition ${
-                  isConnected
-                    ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 cursor-default"
-                    : status?.[platform] === "not_required"
-                    ? "bg-gray-100 dark:bg-gray-900/30 text-gray-500 cursor-default"
-                    : "bg-primary-600 hover:bg-primary-700 text-white"
-                }`}
-              >
-                {isConnected ? "已连接" : status?.[platform] === "not_required" ? "无需登录" : "登录"}
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleLogin(platform)}
+                  disabled={status?.[platform] === "not_required"}
+                  className={`px-4 py-2 rounded-lg font-medium transition ${
+                    isConnected
+                      ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 cursor-default"
+                      : status?.[platform] === "not_required"
+                      ? "bg-gray-100 dark:bg-gray-900/30 text-gray-500 cursor-default"
+                      : "bg-primary-600 hover:bg-primary-700 text-white"
+                  }`}
+                >
+                  {isConnected ? "已连接" : status?.[platform] === "not_required" ? "无需登录" : "登录"}
+                </button>
+                {isConnected && (
+                  <button
+                    onClick={async () => {
+                      await fetch(`${SOCIAL_API_URL}/api/social/logout/${platformToApi[platform]}`, { method: "POST" });
+                      loadStatus();
+                    }}
+                    className="px-3 py-2 rounded-lg text-sm bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 transition"
+                  >
+                    重新登录
+                  </button>
+                )}
+              </div>
             </div>
           );
         })}

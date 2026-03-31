@@ -102,8 +102,8 @@ async def main(platform: str):
     async with async_playwright() as p:
         context = await p.chromium.launch_persistent_context(
             user_data_dir=user_data_dir,
-            headless=True,
-            args=["--disable-blink-features=AutomationControlled"],
+            headless=False,  # 必须非 headless，否则被反爬检测
+            args=["--disable-blink-features=AutomationControlled", "--no-sandbox"],
         )
         page = context.pages[0] if context.pages else await context.new_page()
 

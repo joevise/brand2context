@@ -176,6 +176,24 @@ def cancel_social_login(platform: str):
     return {"status": "cancelled"}
 
 
+@app.post("/api/social/logout/{platform}")
+def logout_platform(platform: str):
+    """清除平台登录态，重置为未登录"""
+    if platform not in VALID_PLATFORMS:
+        return {"status": "error", "message": f"Invalid platform: {platform}"}
+    
+    # 先取消正在进行的登录
+    cancel_social_login(platform)
+    
+    # 删除 cookie 数据库
+    import shutil
+    user_data_dir = f"{MEDIACRAWLER_PATH}/browser_data/{platform}_user_data_dir"
+    if os.path.exists(user_data_dir):
+        shutil.rmtree(user_data_dir, ignore_errors=True)
+    
+    return {"status": "logged_out"}
+
+
 @app.get("/health")
 def health():
     return {"status": "ok", "service": "brand2context-social-api"}
