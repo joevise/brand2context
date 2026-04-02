@@ -145,35 +145,46 @@ export async function batchCreateBrands(
 
 export interface AdminDashboard {
   total_brands: number;
-  total_categories: number;
-  pending_updates: number;
+  brands_by_category: { name: string; count: number }[];
+  brands_by_status: { done: number; processing: number; error: number; pending: number };
+  recent_brands: { name: string; created_at: string; status: string }[];
+  failed_brands: { name: string; error_message: string; created_at: string }[];
+  outdated_count: number;
+  queue_status: { running: number; queued: number; paused: boolean };
   total_api_calls: number;
-  category_distribution: { name: string; count: number }[];
-  recent_failures: { id: string; name: string; url: string; category: string; error: string; updated_at: string }[];
 }
 
 export interface Seed {
-  id: string;
   name: string;
   url: string;
   category: string;
   status: "new" | "done" | "outdated" | "processing" | "error";
-  last_updated: string | null;
-  error_message?: string;
+  brand_id: string | null;
+  last_refreshed: string | null;
+}
+
+export interface SeedsResponse {
+  seeds: Seed[];
+  total: number;
+  categories: { name: string; count: number }[];
 }
 
 export interface BatchStatus {
+  task_id: string | null;
   total: number;
   completed: number;
-  in_progress: number;
+  processing: number;
   queued: number;
   failed: number;
-  brands: { id: string; name: string; status: string; error?: string }[];
+  paused: boolean;
+  running_items: { name: string; url: string; brand_id: string }[];
+  completed_items: { name: string; url: string; brand_id: string }[];
+  failed_items: { name: string; url: string; brand_id: string; error?: string }[];
 }
 
 export interface AdminSettings {
-  update_interval_days: number;
-  max_concurrency: number;
+  refresh_cycle_days: number;
+  max_concurrent: number;
 }
 
 export async function getAdminDashboard(): Promise<AdminDashboard> {
@@ -182,7 +193,7 @@ export async function getAdminDashboard(): Promise<AdminDashboard> {
   return res.json();
 }
 
-export async function getAdminSeeds(category?: string): Promise<Seed[]> {
+export async function getAdminSeeds(category?: string): Promise<SeedsResponse> {
   const params = new URLSearchParams();
   if (category) params.set("category", category);
   const res = await fetch(`${API_URL}/api/admin/seeds?${params}`, { cache: "no-store" });
@@ -190,7 +201,7 @@ export async function getAdminSeeds(category?: string): Promise<Seed[]> {
   return res.json();
 }
 
-export async function createSeed(data: { name: string; url: string; category: string }): Promise<Seed> {
+export async function createSeed(data: { name: string; url: string; category: string }): Promise<{ message: string; added: boolean; total: number }> {
   const res = await fetch(`${API_URL}/api/admin/seeds`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -200,12 +211,7 @@ export async function createSeed(data: { name: string; url: string; category: st
   return res.json();
 }
 
-export async function deleteSeed(id: string): Promise<void> {
-  const res = await fetch(`${API_URL}/api/admin/seeds/${id}`, { method: "DELETE" });
-  if (!res.ok) throw new Error("Failed to delete seed");
-}
-
-export async function aiGenerateSeeds(data: { category: string; count: number }): Promise<{ generated: number }> {
+export async function aiGenerateSeeds(data: { category: string; count: number }): Promise<{ added: number; brands: Seed[]; total_seeds: number }> {
   const res = await fetch(`${API_URL}/api/admin/seeds/ai-generate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -215,7 +221,7 @@ export async function aiGenerateSeeds(data: { category: string; count: number })
   return res.json();
 }
 
-export async function searchAddSeed(data: { brand_name: string }): Promise<Seed> {
+export async function searchAddSeed(data: { brand_name: string; category?: string }): Promise<{ message: string; added: boolean; brand: { name: string; url: string } }> {
   const res = await fetch(`${API_URL}/api/admin/seeds/search-add`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -225,13 +231,14 @@ export async function searchAddSeed(data: { brand_name: string }): Promise<Seed>
   return res.json();
 }
 
-export async function startBatch(data: { category?: string; batch_size: number; filter: string }): Promise<void> {
+export async function startBatch(data: { category?: string; batch_size: number; filter: string }): Promise<{ task_id: string | null; total: number; message: string }> {
   const res = await fetch(`${API_URL}/api/admin/batch/start`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error("Failed to start batch");
+  return res.json();
 }
 
 export async function getBatchStatus(): Promise<BatchStatus> {
@@ -255,14 +262,18 @@ export async function retryFailedBatch(): Promise<void> {
   if (!res.ok) throw new Error("Failed to retry failed");
 }
 
-export async function getRefreshStatus(): Promise<{ outdated_brands: { id: string; name: string; url: string; days_since_update: number }[] }> {
+export async function getRefreshStatus(): Promise<{ total_brands: number; up_to_date: number; outdated: number; outdated_brands: { id: string; name: string; url: string; last_refreshed: string | null; days_since: number }[]; refresh_cycle_days: number }> {
   const res = await fetch(`${API_URL}/api/admin/refresh-status`, { cache: "no-store" });
   if (!res.ok) throw new Error("Failed to get refresh status");
   return res.json();
 }
 
-export async function refreshOutdated(): Promise<{ refreshed: number }> {
-  const res = await fetch(`${API_URL}/api/admin/refresh-outdated`, { method: "POST" });
+export async function refreshOutdated(data: { batch_size: number }): Promise<{ task_id: string; total: number; message: string }> {
+  const res = await fetch(`${API_URL}/api/admin/refresh-outdated`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
   if (!res.ok) throw new Error("Failed to refresh outdated");
   return res.json();
 }

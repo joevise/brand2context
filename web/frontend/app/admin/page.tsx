@@ -4,7 +4,6 @@ import {
   getAdminDashboard,
   getAdminSeeds,
   createSeed,
-  deleteSeed,
   aiGenerateSeeds,
   searchAddSeed,
   startBatch,
@@ -28,7 +27,6 @@ import {
   RefreshCw,
   Plus,
   Search,
-  Trash2,
   Play,
   Pause,
   RotateCcw,
@@ -287,8 +285,10 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<"seeds" | "batch" | "refresh">("seeds");
   const [dashboard, setDashboard] = useState<AdminDashboard | null>(null);
   const [seeds, setSeeds] = useState<Seed[]>([]);
+  const [seedsTotal, setSeedsTotal] = useState(0);
+  const [seedsCategories, setSeedsCategories] = useState<{ name: string; count: number }[]>([]);
   const [batchStatus, setBatchStatus] = useState<BatchStatus | null>(null);
-  const [refreshStatus, setRefreshStatus] = useState<{ outdated_brands: { id: string; name: string; url: string; days_since_update: number }[] } | null>(null);
+  const [refreshStatus, setRefreshStatus] = useState<{ total_brands: number; up_to_date: number; outdated: number; outdated_brands: { id: string; name: string; url: string; last_refreshed: string | null; days_since: number }[]; refresh_cycle_days: number } | null>(null);
   const [settings, setSettings] = useState<AdminSettings | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [categories, setCategories] = useState<string[]>([]);
@@ -304,7 +304,7 @@ export default function AdminPage() {
     try {
       const data = await getAdminDashboard();
       setDashboard(data);
-      const cats = ["all", ...data.category_distribution.map((c) => c.name)];
+      const cats = ["all", ...data.brands_by_category.map((c) => c.name)];
       setCategories(cats);
     } catch {}
   }, []);
@@ -313,7 +313,9 @@ export default function AdminPage() {
     try {
       const cat = selectedCategory === "all" ? undefined : selectedCategory;
       const data = await getAdminSeeds(cat);
-      setSeeds(data);
+      setSeeds(data.seeds);
+      setSeedsTotal(data.total);
+      setSeedsCategories(data.categories);
     } catch {}
   }, [selectedCategory]);
 
@@ -372,13 +374,6 @@ export default function AdminPage() {
     }
   }, [selectedCategory, loading, fetchSeeds]);
 
-  const handleDeleteSeed = async (id: string) => {
-    try {
-      await deleteSeed(id);
-      setSeeds((prev) => prev.filter((s) => s.id !== id));
-    } catch {}
-  };
-
   const handleStartBatch = async () => {
     try {
       await startBatch({
@@ -413,7 +408,7 @@ export default function AdminPage() {
 
   const handleRefreshOutdated = async () => {
     try {
-      await refreshOutdated();
+      await refreshOutdated({ batch_size: batchSize });
       fetchRefreshStatus();
       fetchDashboard();
     } catch {}
@@ -463,7 +458,7 @@ export default function AdminPage() {
             <div className="flex items-center gap-3">
               <BarChart3 className="w-5 h-5 text-purple-400" />
               <div>
-                <div className="text-2xl font-bold">{dashboard?.total_categories ?? 0}</div>
+                <div className="text-2xl font-bold">{dashboard?.brands_by_category?.length ?? 0}</div>
                 <div className="text-xs text-gray-400">品类数</div>
               </div>
             </div>
@@ -472,7 +467,7 @@ export default function AdminPage() {
             <div className="flex items-center gap-3">
               <RefreshCw className="w-5 h-5 text-orange-400" />
               <div>
-                <div className="text-2xl font-bold">{dashboard?.pending_updates ?? 0}</div>
+                <div className="text-2xl font-bold">{dashboard?.outdated_count ?? 0}</div>
                 <div className="text-xs text-gray-400">待更新数</div>
               </div>
             </div>
@@ -492,8 +487,8 @@ export default function AdminPage() {
           <div className="col-span-2 bg-gray-900/50 rounded-xl p-4 border border-gray-800">
             <h3 className="text-sm font-medium text-gray-400 mb-4">品类分布</h3>
             <div className="space-y-2">
-              {dashboard?.category_distribution.map((cat) => {
-                const total = dashboard.category_distribution.reduce((a, b) => a + b.count, 0);
+              {dashboard?.brands_by_category.map((cat) => {
+                const total = dashboard.brands_by_category.reduce((a, b) => a + b.count, 0);
                 const pct = total > 0 ? (cat.count / total) * 100 : 0;
                 return (
                   <div key={cat.name} className="flex items-center gap-3">
@@ -513,13 +508,13 @@ export default function AdminPage() {
           <div className="bg-gray-900/50 rounded-xl p-4 border border-gray-800">
             <h3 className="text-sm font-medium text-gray-400 mb-4">最近失败</h3>
             <div className="space-y-2 max-h-48 overflow-y-auto">
-              {dashboard?.recent_failures.length === 0 && (
+              {dashboard?.failed_brands.length === 0 && (
                 <div className="text-sm text-gray-500 text-center py-4">暂无失败记录</div>
               )}
-              {dashboard?.recent_failures.map((f) => (
-                <div key={f.id} className="p-2 rounded bg-red-950/30 border border-red-900/30">
+              {dashboard?.failed_brands.map((f, i) => (
+                <div key={i} className="p-2 rounded bg-red-950/30 border border-red-900/30">
                   <div className="text-sm font-medium truncate">{f.name}</div>
-                  <div className="text-xs text-red-400 truncate">{f.error}</div>
+                  <div className="text-xs text-red-400 truncate">{f.error_message}</div>
                 </div>
               ))}
             </div>
@@ -615,13 +610,13 @@ export default function AdminPage() {
                         <th className="pb-3 font-medium">官网</th>
                         <th className="pb-3 font-medium">品类</th>
                         <th className="pb-3 font-medium">状态</th>
-                        <th className="pb-3 font-medium">上次更新</th>
-                        <th className="pb-3 font-medium">操作</th>
+                        <th className="pb-3 font-medium">品牌ID</th>
+                        <th className="pb-3 font-medium">上次刷新</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {seeds.map((seed) => (
-                        <tr key={seed.id} className="border-b border-gray-800/50 hover:bg-gray-800/30">
+                      {seeds.map((seed, i) => (
+                        <tr key={i} className="border-b border-gray-800/50 hover:bg-gray-800/30">
                           <td className="py-3 font-medium">{seed.name}</td>
                           <td className="py-3 text-gray-400 truncate max-w-[200px]">{seed.url}</td>
                           <td className="py-3 text-gray-400">{seed.category}</td>
@@ -635,17 +630,11 @@ export default function AdminPage() {
                               {seed.status}
                             </span>
                           </td>
-                          <td className="py-3 text-gray-400 text-xs">
-                            {seed.last_updated ? new Date(seed.last_updated).toLocaleDateString() : "-"}
+                          <td className="py-3 text-gray-400 text-xs truncate max-w-[100px]">
+                            {seed.brand_id || "-"}
                           </td>
-                          <td className="py-3">
-                            <button
-                              onClick={() => handleDeleteSeed(seed.id)}
-                              className="p-1.5 rounded hover:bg-red-600/20 text-red-400 transition"
-                              title="删除"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                          <td className="py-3 text-gray-400 text-xs">
+                            {seed.last_refreshed ? new Date(seed.last_refreshed).toLocaleDateString() : "-"}
                           </td>
                         </tr>
                       ))}
@@ -728,7 +717,7 @@ export default function AdminPage() {
                       <div className="text-xs text-gray-400">完成</div>
                     </div>
                     <div className="text-center p-3 rounded bg-gray-900/50">
-                      <div className="text-2xl font-bold text-blue-400">{batchStatus?.in_progress ?? 0}</div>
+                      <div className="text-2xl font-bold text-blue-400">{batchStatus?.processing ?? 0}</div>
                       <div className="text-xs text-gray-400">进行中</div>
                     </div>
                     <div className="text-center p-3 rounded bg-gray-900/50">
@@ -754,7 +743,7 @@ export default function AdminPage() {
                         style={{
                           width: `${
                             batchStatus?.total
-                              ? ((batchStatus.completed + batchStatus.in_progress) / batchStatus.total) * 100
+                              ? ((batchStatus.completed + batchStatus.processing) / batchStatus.total) * 100
                               : 0
                           }%`,
                         }}
@@ -763,30 +752,43 @@ export default function AdminPage() {
                   </div>
 
                   <div className="max-h-64 overflow-y-auto space-y-2">
-                    {batchStatus?.brands.map((brand) => (
+                    {batchStatus?.running_items.map((brand) => (
                       <div
-                        key={brand.id}
+                        key={brand.brand_id}
                         className="flex items-center justify-between p-2 rounded bg-gray-900/50"
                       >
                         <div className="flex items-center gap-2">
-                          {brand.status === "completed" && (
-                            <CheckCircle className="w-4 h-4 text-green-400" />
-                          )}
-                          {brand.status === "in_progress" && (
-                            <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
-                          )}
-                          {brand.status === "queued" && (
-                            <Clock className="w-4 h-4 text-gray-400" />
-                          )}
-                          {brand.status === "failed" && (
-                            <XCircle className="w-4 h-4 text-red-400" />
-                          )}
+                          <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
                           <span className="text-sm">{brand.name}</span>
                         </div>
-                        <div className="text-xs text-gray-500">{brand.status}</div>
+                        <div className="text-xs text-gray-500">进行中</div>
                       </div>
                     ))}
-                    {(!batchStatus || batchStatus.brands.length === 0) && (
+                    {batchStatus?.completed_items.map((brand) => (
+                      <div
+                        key={brand.brand_id}
+                        className="flex items-center justify-between p-2 rounded bg-gray-900/50"
+                      >
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="w-4 h-4 text-green-400" />
+                          <span className="text-sm">{brand.name}</span>
+                        </div>
+                        <div className="text-xs text-gray-500">完成</div>
+                      </div>
+                    ))}
+                    {batchStatus?.failed_items.map((brand) => (
+                      <div
+                        key={brand.brand_id}
+                        className="flex items-center justify-between p-2 rounded bg-gray-900/50"
+                      >
+                        <div className="flex items-center gap-2">
+                          <XCircle className="w-4 h-4 text-red-400" />
+                          <span className="text-sm">{brand.name}</span>
+                        </div>
+                        <div className="text-xs text-gray-500">失败</div>
+                      </div>
+                    ))}
+                    {(!batchStatus || (batchStatus.running_items.length === 0 && batchStatus.completed_items.length === 0 && batchStatus.failed_items.length === 0)) && (
                       <div className="text-center py-4 text-gray-500 text-sm">暂无正在进行的任务</div>
                     )}
                   </div>
@@ -801,10 +803,10 @@ export default function AdminPage() {
                     <label className="block text-xs text-gray-400 mb-2">更新周期（天）</label>
                     <input
                       type="number"
-                      value={settings?.update_interval_days ?? 7}
+                      value={settings?.refresh_cycle_days ?? 30}
                       onChange={(e) =>
                         setSettings((prev) =>
-                          prev ? { ...prev, update_interval_days: Number(e.target.value) } : null
+                          prev ? { ...prev, refresh_cycle_days: Number(e.target.value) } : null
                         )
                       }
                       min={1}
@@ -815,10 +817,10 @@ export default function AdminPage() {
                     <label className="block text-xs text-gray-400 mb-2">最大并发数</label>
                     <input
                       type="number"
-                      value={settings?.max_concurrency ?? 5}
+                      value={settings?.max_concurrent ?? 5}
                       onChange={(e) =>
                         setSettings((prev) =>
-                          prev ? { ...prev, max_concurrency: Number(e.target.value) } : null
+                          prev ? { ...prev, max_concurrent: Number(e.target.value) } : null
                         )
                       }
                       min={1}
@@ -835,7 +837,7 @@ export default function AdminPage() {
 
                 <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
                   <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-sm font-medium">待更新品牌 ({refreshStatus?.outdated_brands.length ?? 0})</h4>
+                    <h4 className="text-sm font-medium">待更新品牌 ({refreshStatus?.outdated ?? 0})</h4>
                     <button
                       onClick={handleRefreshOutdated}
                       className="px-3 py-1.5 rounded-lg bg-orange-600/20 text-orange-400 border border-orange-600/30 text-xs font-medium hover:bg-orange-600/30 transition flex items-center gap-1"
@@ -856,7 +858,7 @@ export default function AdminPage() {
                           <div className="text-xs text-gray-500 truncate max-w-[300px]">{brand.url}</div>
                         </div>
                         <div className="text-right">
-                          <div className="text-sm text-orange-400">{brand.days_since_update} 天</div>
+                          <div className="text-sm text-orange-400">{brand.days_since} 天</div>
                           <div className="text-xs text-gray-500">未更新</div>
                         </div>
                       </div>
