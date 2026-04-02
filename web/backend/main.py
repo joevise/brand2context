@@ -132,6 +132,98 @@ def list_brands(db: Session = Depends(get_db)):
     return [brand_to_response(b) for b in brands]
 
 
+# --- Brand Search (MUST be before {brand_id} route!) ---
+@app.get("/api/brands/search")
+def search_brands_early(
+    q: str = "",
+    category: Optional[str] = None,
+    page: int = 1,
+    per_page: int = 20,
+    db: Session = Depends(get_db),
+):
+    query = db.query(Brand).filter(Brand.status == "done", Brand.is_public == True)
+
+    if q:
+        query = query.filter(Brand.name.ilike(f"%{q}%"))
+    if category:
+        query = query.filter(Brand.category == category)
+
+    total = query.count()
+    brands = (
+        query.order_by(Brand.created_at.desc())
+        .offset((page - 1) * per_page)
+        .limit(per_page)
+        .all()
+    )
+
+    return {
+        "brands": [
+            {
+                "id": b.id,
+                "name": b.name,
+                "slug": b.slug,
+                "logo_url": b.logo_url,
+                "category": b.category,
+                "description": b.description,
+                "url": b.url,
+            }
+            for b in brands
+        ],
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+    }
+
+
+# --- Get Brand by Slug (MUST be before {brand_id} route!) ---
+@app.get("/api/brands/by-slug/{slug}")
+def get_brand_by_slug_early(slug: str, db: Session = Depends(get_db)):
+    brand = db.query(Brand).filter(Brand.slug == slug).first()
+    if not brand:
+        raise HTTPException(status_code=404, detail="Brand not found")
+
+    _record_call(brand.id)
+
+    result = brand_to_response(brand)
+    json_path = os.path.join(DATA_DIR, f"{brand.id}.json")
+    if os.path.exists(json_path):
+        with open(json_path, "r", encoding="utf-8") as f:
+            result["data"] = json.load(f)
+    return result
+
+
+# --- Batch Create Brands (MUST be before {brand_id} route!) ---
+@app.post("/api/brands/batch")
+def batch_create_brands_early(body: BatchBrandCreate, db: Session = Depends(get_db)):
+    created_ids = []
+
+    for item in body.brands:
+        url = item.get("url", "")
+        if not url:
+            continue
+        if not url.startswith("http"):
+            url = "https://" + url
+
+        brand_id = str(uuid.uuid4())
+        brand = Brand(
+            id=brand_id,
+            url=url,
+            status="pending",
+            category=item.get("category"),
+        )
+        db.add(brand)
+        db.commit()
+
+        thread = threading.Thread(
+            target=run_brand_pipeline, args=(brand_id, url), daemon=True
+        )
+        thread.start()
+
+        created_ids.append(brand_id)
+
+    return {"created_ids": created_ids}
+
+
 @app.get("/api/brands/{brand_id}")
 def get_brand(brand_id: str, db: Session = Depends(get_db)):
     brand = db.query(Brand).filter(Brand.id == brand_id).first()
@@ -214,66 +306,6 @@ def search_brand_endpoint(brand_id: str, q: str = "", db: Session = Depends(get_
         return {"documents": [], "distances": [], "metadatas": []}
     except Exception as e:
         return {"documents": [], "distances": [], "metadatas": [], "error": str(e)}
-
-
-# --- Brand Search ---
-@app.get("/api/brands/search")
-def search_brands(
-    q: str = "",
-    category: Optional[str] = None,
-    page: int = 1,
-    per_page: int = 20,
-    db: Session = Depends(get_db),
-):
-    query = db.query(Brand).filter(Brand.status == "done", Brand.is_public == True)
-
-    if q:
-        query = query.filter(Brand.name.ilike(f"%{q}%"))
-    if category:
-        query = query.filter(Brand.category == category)
-
-    total = query.count()
-    brands = (
-        query.order_by(Brand.created_at.desc())
-        .offset((page - 1) * per_page)
-        .limit(per_page)
-        .all()
-    )
-
-    return {
-        "brands": [
-            {
-                "id": b.id,
-                "name": b.name,
-                "slug": b.slug,
-                "logo_url": b.logo_url,
-                "category": b.category,
-                "description": b.description,
-                "url": b.url,
-            }
-            for b in brands
-        ],
-        "total": total,
-        "page": page,
-        "per_page": per_page,
-    }
-
-
-# --- Get Brand by Slug ---
-@app.get("/api/brands/by-slug/{slug}")
-def get_brand_by_slug(slug: str, db: Session = Depends(get_db)):
-    brand = db.query(Brand).filter(Brand.slug == slug).first()
-    if not brand:
-        raise HTTPException(status_code=404, detail="Brand not found")
-
-    _record_call(brand.id)
-
-    result = brand_to_response(brand)
-    json_path = os.path.join(DATA_DIR, f"{brand.id}.json")
-    if os.path.exists(json_path):
-        with open(json_path, "r", encoding="utf-8") as f:
-            result["data"] = json.load(f)
-    return result
 
 
 # --- Categories List ---
