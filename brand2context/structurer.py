@@ -115,5 +115,46 @@ Generate the complete brand knowledge JSON now:"""
         print("   ✅ Brand knowledge base generated")
         return result
     except Exception as e:
-        print(f"   ❌ Structuring failed: {e}")
-        raise
+        print(f"   ⚠️ 首次结构化失败: {e}")
+        # Retry with simplified prompt
+        print("   🔄 使用简化 prompt 重试...")
+        try:
+            brand_name = clues.get("brand_name", "Unknown")
+            retry_prompt = f"""Generate a brand knowledge JSON for "{brand_name}" (website: {url}).
+
+Use this simplified structure:
+{{
+  "schema_version": "0.3.0",
+  "generated_at": "{datetime.now(timezone.utc).isoformat()}",
+  "source_urls": ["{url}"],
+  "identity": {{"name": "", "tagline": "", "positioning": "", "category": "", "founded": "", "headquarters": ""}},
+  "offerings": [{{"name": "", "category": "", "description": "", "key_features": []}}],
+  "differentiation": {{"unique_selling_points": [], "competitive_advantages": []}},
+  "trust": {{"certifications": [], "partnerships": []}},
+  "experience": {{}},
+  "access": {{"official_website": "{url}"}},
+  "content": {{}},
+  "perception": {{"personality_traits": [], "brand_tone": "", "price_positioning": ""}},
+  "decision_factors": {{}},
+  "vitality": {{}},
+  "campaigns": {{}}
+}}
+
+Available data:
+{search_content[:5000] if search_content.strip() else website_content[:5000]}
+
+Fill in as much as possible. Output ONLY valid JSON."""
+
+            result = chat_json(
+                retry_prompt,
+                system="Output ONLY valid JSON. No explanation.",
+                max_tokens=8000,
+            )
+            result["schema_version"] = "0.3.0"
+            result["generated_at"] = datetime.now(timezone.utc).isoformat()
+            result.setdefault("source_urls", [url])
+            print("   ✅ 重试成功，品牌知识库已生成（简化版）")
+            return result
+        except Exception as e2:
+            print(f"   ❌ 重试也失败: {e2}")
+            raise e

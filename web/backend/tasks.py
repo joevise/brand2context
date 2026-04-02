@@ -82,10 +82,55 @@ def run_brand_pipeline(brand_id: str, url: str):
         from brand2context.web_searcher import search_expand
         from brand2context.structurer import structure_brand
 
+        # Step 1: Try crawling the website
         pages = crawl_site(url)
         clues = extract_clues(pages, url)
+
+        # Step 2: If crawl failed, infer brand name from URL/DB for search fallback
+        if not pages:
+            print(f"⚠️ 爬取失败，启用搜索降级模式: {url}")
+            if not clues.get("brand_name"):
+                # Try to get brand name from DB (admin may have set it)
+                brand_name_guess = brand.name
+                if not brand_name_guess:
+                    # Infer from domain: www.tesla.com -> tesla
+                    domain = urlparse(url).netloc.replace("www.", "").split(".")[0]
+                    brand_name_guess = domain.capitalize()
+                clues["brand_name"] = brand_name_guess
+                clues["url"] = url
+                print(f"   → 推测品牌名: {brand_name_guess}")
+
+        # Step 3: Web search expansion (works even without pages)
         search_results = search_expand(clues)
 
+        # Step 3.5: If both crawl and search failed, try one more time with broader search
+        if not pages and not search_results:
+            print(f"⚠️ 常规搜索也失败，尝试扩展搜索...")
+            brand_name = clues.get("brand_name", "")
+            if brand_name:
+                try:
+                    import requests as req
+                    from brand2context.config import TAVILY_API_KEY, TAVILY_ENDPOINT
+                    if TAVILY_API_KEY:
+                        for q in [f"{brand_name} 品牌 官网", f"{brand_name} brand"]:
+                            resp = req.post(
+                                TAVILY_ENDPOINT,
+                                json={"query": q, "max_results": 8, "include_answer": True},
+                                headers={"Content-Type": "application/json", "Authorization": f"Bearer {TAVILY_API_KEY}"},
+                                timeout=30,
+                            )
+                            if resp.status_code == 200:
+                                data = resp.json()
+                                search_results.append({
+                                    "query": q,
+                                    "answer": data.get("answer", ""),
+                                    "results": [{"title": r.get("title", ""), "url": r.get("url", ""), "content": r.get("content", "")} for r in data.get("results", [])],
+                                })
+                                print(f"   ✅ 扩展搜索 '{q}' → {len(data.get('results', []))} results")
+                except Exception as e:
+                    print(f"   ⚠️ 扩展搜索失败: {e}")
+
+        # Step 3.6: Social media crawl
         social_results = []
         brand_name_for_social = clues.get("brand_name", "")
         if brand_name_for_social:
@@ -108,12 +153,17 @@ def run_brand_pipeline(brand_id: str, url: str):
             except Exception as e:
                 print(f"⚠️ 社交媒体抓取跳过: {e}")
 
+        # Final check: if absolutely nothing, then fail
         if not pages and not search_results:
             brand.status = "error"
-            brand.error_message = "No data collected from URL"
+            brand.error_message = "No data collected from URL and search fallback also failed"
             brand.updated_at = datetime.now(timezone.utc)
             db.commit()
             return
+
+        # Mark if using degraded mode
+        if not pages and search_results:
+            print(f"📡 降级模式：使用搜索结果生成知识库（无官网爬取数据）")
 
         result = structure_brand(url, pages, clues, search_results, social_results)
 
