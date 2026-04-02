@@ -445,6 +445,106 @@ def retry_failed():
     return {"message": f"Retrying {count} failed brands", "count": count}
 
 
+class RetryDBRequest(BaseModel):
+    batch_size: int = 10
+
+
+@admin_router.post("/batch/retry-db-errors")
+def retry_db_errors(body: RetryDBRequest, db: Session = Depends(get_db)):
+    """Retry all brands with status='error' in the database."""
+    error_brands = (
+        db.query(Brand)
+        .filter(Brand.status == "error")
+        .order_by(Brand.created_at.desc())
+        .limit(body.batch_size)
+        .all()
+    )
+
+    if not error_brands:
+        return {"message": "No error brands to retry", "count": 0}
+
+    # Reset their status and re-queue
+    to_crawl = []
+    for b in error_brands:
+        b.status = "pending"
+        b.error_message = None
+        b.updated_at = datetime.now(timezone.utc)
+        to_crawl.append({"name": b.name or "", "url": b.url, "category": b.category or "", "brand_id": b.id})
+    db.commit()
+
+    # Use existing brand IDs instead of creating new ones
+    settings = _load_settings()
+    batch_queue.max_concurrent = settings["max_concurrent"]
+
+    # Custom start that reuses existing brand records
+    batch_queue.task_id = str(uuid.uuid4())[:8]
+    batch_queue.completed = []
+    batch_queue.failed = []
+    batch_queue.running = {}
+    batch_queue.paused = False
+    batch_queue.total = len(to_crawl)
+
+    for item in to_crawl:
+        batch_queue.q.put(item)
+
+    if batch_queue._worker_thread is None or not batch_queue._worker_thread.is_alive():
+        batch_queue._worker_thread = threading.Thread(target=_retry_worker, daemon=True)
+        batch_queue._worker_thread.start()
+
+    return {"message": f"Retrying {len(to_crawl)} error brands", "count": len(to_crawl)}
+
+
+def _retry_worker():
+    """Worker that reuses existing brand IDs for retry."""
+    while True:
+        if batch_queue.q.empty() and not batch_queue.running:
+            break
+        if batch_queue.paused:
+            time.sleep(1)
+            continue
+
+        # Clean finished threads
+        with batch_queue._lock:
+            done_ids = [bid for bid, info in batch_queue.running.items() if not info["thread"].is_alive()]
+            for bid in done_ids:
+                info = batch_queue.running.pop(bid)
+                db = SessionLocal()
+                brand = db.query(Brand).filter(Brand.id == bid).first()
+                if brand and brand.status == "done":
+                    batch_queue.completed.append({"name": info["name"], "url": info["url"], "brand_id": bid})
+                elif brand and brand.status == "error":
+                    batch_queue.failed.append({"name": info["name"], "url": info["url"], "brand_id": bid, "error": brand.error_message})
+                else:
+                    batch_queue.completed.append({"name": info["name"], "url": info["url"], "brand_id": bid})
+                db.close()
+
+        while len(batch_queue.running) < batch_queue.max_concurrent and not batch_queue.q.empty() and not batch_queue.paused:
+            item = batch_queue.q.get()
+            url = item.get("url", "")
+            name = item.get("name", "")
+            brand_id = item.get("brand_id")
+
+            if not url.startswith("http"):
+                url = "https://" + url
+
+            # Reuse existing brand_id if provided, otherwise create new
+            if not brand_id:
+                brand_id = str(uuid.uuid4())
+                db = SessionLocal()
+                brand = Brand(id=brand_id, url=url, status="pending", category=item.get("category", ""))
+                db.add(brand)
+                db.commit()
+                db.close()
+
+            t = threading.Thread(target=run_brand_pipeline, args=(brand_id, url), daemon=True)
+            t.start()
+
+            with batch_queue._lock:
+                batch_queue.running[brand_id] = {"thread": t, "name": name, "url": url}
+
+        time.sleep(2)
+
+
 # ============================================================
 # Refresh Scheduling
 # ============================================================

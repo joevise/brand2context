@@ -506,14 +506,32 @@ export default function AdminPage() {
             </div>
           </div>
           <div className="bg-gray-900/50 rounded-xl p-4 border border-gray-800">
-            <h3 className="text-sm font-medium text-gray-400 mb-4">最近失败</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-medium text-gray-400">最近失败 ({dashboard?.brands_by_status?.error ?? 0})</h3>
+              {(dashboard?.brands_by_status?.error ?? 0) > 0 && (
+                <button
+                  onClick={async () => {
+                    try {
+                      const { retryDBErrors } = await import("@/lib/api");
+                      const result = await retryDBErrors(10);
+                      alert(`已启动重试 ${result.count} 个失败品牌`);
+                      fetchDashboard();
+                      fetchBatchStatus();
+                    } catch {}
+                  }}
+                  className="px-3 py-1 rounded-lg bg-red-600/20 text-red-400 border border-red-600/30 text-xs font-medium hover:bg-red-600/30 transition flex items-center gap-1"
+                >
+                  <RotateCcw className="w-3 h-3" /> 重试全部失败
+                </button>
+              )}
+            </div>
             <div className="space-y-2 max-h-48 overflow-y-auto">
               {dashboard?.failed_brands.length === 0 && (
                 <div className="text-sm text-gray-500 text-center py-4">暂无失败记录</div>
               )}
               {dashboard?.failed_brands.map((f, i) => (
                 <div key={i} className="p-2 rounded bg-red-950/30 border border-red-900/30">
-                  <div className="text-sm font-medium truncate">{f.name}</div>
+                  <div className="text-sm font-medium truncate">{f.name || "(unnamed)"}</div>
                   <div className="text-xs text-red-400 truncate">{f.error_message}</div>
                 </div>
               ))}

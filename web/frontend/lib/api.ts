@@ -293,3 +293,13 @@ export async function updateAdminSettings(data: AdminSettings): Promise<AdminSet
   if (!res.ok) throw new Error("Failed to update settings");
   return res.json();
 }
+
+export async function retryDBErrors(batchSize: number = 10): Promise<{ message: string; count: number }> {
+  const res = await fetch(`${API_URL}/api/admin/batch/retry-db-errors`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ batch_size: batchSize }),
+  });
+  if (!res.ok) throw new Error("Failed to retry DB errors");
+  return res.json();
+}
