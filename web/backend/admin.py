@@ -1,0 +1,582 @@
+"""Admin API for Brand2Context — seed management, batch crawling, refresh scheduling."""
+
+import json
+import os
+import uuid
+import queue
+import threading
+import time
+from datetime import datetime, timezone, timedelta
+from typing import Optional
+
+import httpx
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+from sqlalchemy import func
+
+from models import SessionLocal, Brand, ApiCallLog, get_db, generate_slug
+from tasks import run_brand_pipeline
+
+admin_router = APIRouter(prefix="/api/admin", tags=["admin"])
+
+SEEDS_FILE = os.path.join(os.path.dirname(__file__), "seeds", "brands_seed.json")
+SETTINGS_FILE = os.path.join(os.path.dirname(__file__), "seeds", "settings.json")
+MINIMAX_API_KEY = os.getenv(
+    "MINIMAX_API_KEY",
+    "sk-cp-49r5TFMzeb7-z-HCbtIPK3h7NZPVs8QJIPVIBC9S3JDjeHq4pKU6YZ-srAyN1YH3-LR6wS0ot4f6xEcqR34SsBpE-yPuW-9kb_yGlDRaive4lhwduA3UAZs",
+)
+
+# ============================================================
+# Settings
+# ============================================================
+
+DEFAULT_SETTINGS = {"refresh_cycle_days": 30, "max_concurrent": 5}
+
+
+def _load_settings():
+    if os.path.exists(SETTINGS_FILE):
+        with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+            return {**DEFAULT_SETTINGS, **json.load(f)}
+    return dict(DEFAULT_SETTINGS)
+
+
+def _save_settings(s):
+    os.makedirs(os.path.dirname(SETTINGS_FILE), exist_ok=True)
+    with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+        json.dump(s, f, ensure_ascii=False, indent=2)
+
+
+@admin_router.get("/settings")
+def get_settings():
+    return _load_settings()
+
+
+class SettingsUpdate(BaseModel):
+    refresh_cycle_days: Optional[int] = None
+    max_concurrent: Optional[int] = None
+
+
+@admin_router.put("/settings")
+def update_settings(body: SettingsUpdate):
+    s = _load_settings()
+    if body.refresh_cycle_days is not None:
+        s["refresh_cycle_days"] = body.refresh_cycle_days
+    if body.max_concurrent is not None:
+        s["max_concurrent"] = body.max_concurrent
+        batch_queue.max_concurrent = body.max_concurrent
+    _save_settings(s)
+    return s
+
+
+# ============================================================
+# Seed Library
+# ============================================================
+
+
+def _load_seeds():
+    if os.path.exists(SEEDS_FILE):
+        with open(SEEDS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return []
+
+
+def _save_seeds(seeds):
+    os.makedirs(os.path.dirname(SEEDS_FILE), exist_ok=True)
+    with open(SEEDS_FILE, "w", encoding="utf-8") as f:
+        json.dump(seeds, f, ensure_ascii=False, indent=2)
+
+
+@admin_router.get("/seeds")
+def list_seeds(category: Optional[str] = None, db: Session = Depends(get_db)):
+    seeds = _load_seeds()
+    if category:
+        seeds = [s for s in seeds if s.get("category") == category]
+
+    settings = _load_settings()
+    cycle_days = settings["refresh_cycle_days"]
+    cutoff = datetime.now(timezone.utc) - timedelta(days=cycle_days)
+
+    # Match seeds against DB
+    all_brands = db.query(Brand).all()
+    url_map = {}
+    for b in all_brands:
+        url_map[b.url.rstrip("/")] = b
+
+    result = []
+    for s in seeds:
+        url = s.get("url", "").rstrip("/")
+        brand = url_map.get(url)
+        entry = {
+            "name": s.get("name", ""),
+            "url": s.get("url", ""),
+            "category": s.get("category", ""),
+        }
+        if brand:
+            entry["brand_id"] = brand.id
+            entry["status"] = brand.status
+            entry["last_refreshed"] = brand.last_refreshed.isoformat() if brand.last_refreshed else None
+            if brand.status == "done" and brand.last_refreshed and brand.last_refreshed.replace(tzinfo=timezone.utc) < cutoff:
+                entry["status"] = "outdated"
+        else:
+            entry["status"] = "new"
+            entry["brand_id"] = None
+            entry["last_refreshed"] = None
+        result.append(entry)
+
+    # Categories summary
+    cats = {}
+    for s in _load_seeds():
+        c = s.get("category", "未分类")
+        cats[c] = cats.get(c, 0) + 1
+
+    return {
+        "seeds": result,
+        "total": len(result),
+        "categories": [{"name": k, "count": v} for k, v in sorted(cats.items(), key=lambda x: -x[1])],
+    }
+
+
+class SeedCreate(BaseModel):
+    name: str
+    url: str
+    category: str = ""
+
+
+@admin_router.post("/seeds")
+def add_seed(body: SeedCreate):
+    seeds = _load_seeds()
+    url = body.url.rstrip("/")
+    if any(s.get("url", "").rstrip("/") == url for s in seeds):
+        return {"message": "Already exists", "added": False}
+    seeds.append({"name": body.name, "url": body.url, "category": body.category})
+    _save_seeds(seeds)
+    return {"message": "Added", "added": True, "total": len(seeds)}
+
+
+class AIGenerateRequest(BaseModel):
+    category: str
+    count: int = 20
+
+
+@admin_router.post("/seeds/ai-generate")
+def ai_generate_seeds(body: AIGenerateRequest):
+    prompt = f"""列出"{body.category}"品类的{body.count}个知名品牌（中国品牌和在中国运营的国际品牌），JSON数组格式。
+每个品牌格式：{{"name":"品牌名","url":"https://官网","category":"{body.category}"}}
+要求：URL 必须是真实可访问的官网。只输出JSON数组，不要其他文字。"""
+
+    try:
+        resp = httpx.post(
+            "https://api.minimax.chat/v1/text/chatcompletion_v2",
+            headers={"Authorization": f"Bearer {MINIMAX_API_KEY}", "Content-Type": "application/json"},
+            json={
+                "model": "MiniMax-M2.7",
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 4000,
+                "temperature": 0.2,
+            },
+            timeout=60.0,
+        )
+        content = resp.json()["choices"][0]["message"]["content"]
+        if "```json" in content:
+            content = content.split("```json")[1].split("```")[0]
+        elif "```" in content:
+            content = content.split("```")[1].split("```")[0]
+        new_brands = json.loads(content.strip())
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"AI generation failed: {str(e)}")
+
+    seeds = _load_seeds()
+    existing_urls = {s.get("url", "").rstrip("/") for s in seeds}
+    added = []
+    for b in new_brands:
+        url = b.get("url", "").rstrip("/")
+        if url and url not in existing_urls:
+            entry = {"name": b.get("name", ""), "url": b.get("url", ""), "category": body.category}
+            seeds.append(entry)
+            added.append(entry)
+            existing_urls.add(url)
+    _save_seeds(seeds)
+    return {"added": len(added), "brands": added, "total_seeds": len(seeds)}
+
+
+class SearchAddRequest(BaseModel):
+    brand_name: str
+    category: str = ""
+
+
+@admin_router.post("/seeds/search-add")
+def search_add_seed(body: SearchAddRequest):
+    prompt = f"""找到"{body.brand_name}"这个品牌的官方网站URL。
+只返回JSON：{{"name":"品牌名","url":"https://官网"}}
+不要其他文字。"""
+
+    try:
+        resp = httpx.post(
+            "https://api.minimax.chat/v1/text/chatcompletion_v2",
+            headers={"Authorization": f"Bearer {MINIMAX_API_KEY}", "Content-Type": "application/json"},
+            json={
+                "model": "MiniMax-M2.7",
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 200,
+                "temperature": 0.1,
+            },
+            timeout=30.0,
+        )
+        content = resp.json()["choices"][0]["message"]["content"]
+        if "```json" in content:
+            content = content.split("```json")[1].split("```")[0]
+        elif "```" in content:
+            content = content.split("```")[1].split("```")[0]
+        result = json.loads(content.strip())
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
+
+    seeds = _load_seeds()
+    url = result.get("url", "").rstrip("/")
+    if any(s.get("url", "").rstrip("/") == url for s in seeds):
+        return {"message": "Already exists", "added": False, "brand": result}
+
+    entry = {
+        "name": result.get("name", body.brand_name),
+        "url": result.get("url", ""),
+        "category": body.category,
+    }
+    seeds.append(entry)
+    _save_seeds(seeds)
+    return {"message": "Added", "added": True, "brand": entry}
+
+
+# ============================================================
+# Batch Queue
+# ============================================================
+
+
+class BatchQueue:
+    def __init__(self, max_concurrent=5):
+        self.q = queue.Queue()
+        self.max_concurrent = max_concurrent
+        self.running = {}
+        self.completed = []
+        self.failed = []
+        self.paused = False
+        self.task_id = None
+        self.total = 0
+        self._lock = threading.Lock()
+        self._worker_thread = None
+
+    def start(self, brands_to_crawl):
+        self.task_id = str(uuid.uuid4())[:8]
+        self.completed = []
+        self.failed = []
+        self.running = {}
+        self.paused = False
+        self.total = len(brands_to_crawl)
+
+        for b in brands_to_crawl:
+            self.q.put(b)
+
+        if self._worker_thread is None or not self._worker_thread.is_alive():
+            self._worker_thread = threading.Thread(target=self._worker, daemon=True)
+            self._worker_thread.start()
+
+        return self.task_id
+
+    def _worker(self):
+        while True:
+            if self.q.empty() and not self.running:
+                break
+
+            if self.paused:
+                time.sleep(1)
+                continue
+
+            # Clean finished threads
+            with self._lock:
+                done_ids = [bid for bid, info in self.running.items() if not info["thread"].is_alive()]
+                for bid in done_ids:
+                    info = self.running.pop(bid)
+                    # Check DB for result
+                    db = SessionLocal()
+                    brand = db.query(Brand).filter(Brand.id == bid).first()
+                    if brand and brand.status == "done":
+                        self.completed.append({"name": info["name"], "url": info["url"], "brand_id": bid})
+                    elif brand and brand.status == "error":
+                        self.failed.append({"name": info["name"], "url": info["url"], "brand_id": bid, "error": brand.error_message})
+                    else:
+                        self.completed.append({"name": info["name"], "url": info["url"], "brand_id": bid})
+                    db.close()
+
+            # Start new tasks if capacity available
+            while len(self.running) < self.max_concurrent and not self.q.empty() and not self.paused:
+                item = self.q.get()
+                url = item.get("url", "")
+                name = item.get("name", "")
+                category = item.get("category", "")
+
+                if not url.startswith("http"):
+                    url = "https://" + url
+
+                brand_id = str(uuid.uuid4())
+                db = SessionLocal()
+                brand = Brand(id=brand_id, url=url, status="pending", category=category)
+                db.add(brand)
+                db.commit()
+                db.close()
+
+                t = threading.Thread(target=run_brand_pipeline, args=(brand_id, url), daemon=True)
+                t.start()
+
+                with self._lock:
+                    self.running[brand_id] = {"thread": t, "name": name, "url": url}
+
+            time.sleep(2)
+
+    def pause(self):
+        self.paused = True
+
+    def resume(self):
+        self.paused = False
+
+    def status(self):
+        with self._lock:
+            running_list = [{"name": v["name"], "url": v["url"], "brand_id": k} for k, v in self.running.items()]
+        return {
+            "task_id": self.task_id,
+            "total": self.total,
+            "completed": len(self.completed),
+            "processing": len(running_list),
+            "queued": self.q.qsize(),
+            "failed": len(self.failed),
+            "paused": self.paused,
+            "running_items": running_list,
+            "completed_items": self.completed[-20:],
+            "failed_items": self.failed,
+        }
+
+    def retry_failed(self):
+        items = list(self.failed)
+        self.failed = []
+        for item in items:
+            self.q.put({"name": item["name"], "url": item["url"], "category": ""})
+        self.total += len(items)
+        if self._worker_thread is None or not self._worker_thread.is_alive():
+            self._worker_thread = threading.Thread(target=self._worker, daemon=True)
+            self._worker_thread.start()
+        return len(items)
+
+
+batch_queue = BatchQueue()
+
+
+# ============================================================
+# Batch API
+# ============================================================
+
+
+class BatchStartRequest(BaseModel):
+    category: Optional[str] = None
+    batch_size: int = 10
+    filter: str = "new"  # "new", "outdated", "all"
+
+
+@admin_router.post("/batch/start")
+def start_batch(body: BatchStartRequest, db: Session = Depends(get_db)):
+    seeds = _load_seeds()
+    if body.category:
+        seeds = [s for s in seeds if s.get("category") == body.category]
+
+    settings = _load_settings()
+    cycle_days = settings["refresh_cycle_days"]
+    cutoff = datetime.now(timezone.utc) - timedelta(days=cycle_days)
+
+    all_brands = db.query(Brand).all()
+    url_map = {b.url.rstrip("/"): b for b in all_brands}
+
+    to_crawl = []
+    for s in seeds:
+        url = s.get("url", "").rstrip("/")
+        brand = url_map.get(url)
+
+        if body.filter == "new" and brand is not None:
+            continue
+        if body.filter == "outdated":
+            if not brand or brand.status != "done":
+                continue
+            if brand.last_refreshed and brand.last_refreshed.replace(tzinfo=timezone.utc) >= cutoff:
+                continue
+        # "all" — include everything not currently processing
+        if brand and brand.status == "processing":
+            continue
+
+        to_crawl.append(s)
+
+        if len(to_crawl) >= body.batch_size:
+            break
+
+    if not to_crawl:
+        return {"task_id": None, "total": 0, "message": "No brands to crawl"}
+
+    batch_queue.max_concurrent = settings["max_concurrent"]
+    task_id = batch_queue.start(to_crawl)
+    return {"task_id": task_id, "total": len(to_crawl), "message": f"Started {len(to_crawl)} brands"}
+
+
+@admin_router.get("/batch/status")
+def get_batch_status():
+    return batch_queue.status()
+
+
+@admin_router.post("/batch/pause")
+def pause_batch():
+    batch_queue.pause()
+    return {"message": "Paused", "paused": True}
+
+
+@admin_router.post("/batch/resume")
+def resume_batch():
+    batch_queue.resume()
+    return {"message": "Resumed", "paused": False}
+
+
+@admin_router.post("/batch/retry-failed")
+def retry_failed():
+    count = batch_queue.retry_failed()
+    return {"message": f"Retrying {count} failed brands", "count": count}
+
+
+# ============================================================
+# Refresh Scheduling
+# ============================================================
+
+
+@admin_router.get("/refresh-status")
+def get_refresh_status(db: Session = Depends(get_db)):
+    settings = _load_settings()
+    cycle_days = settings["refresh_cycle_days"]
+    cutoff = datetime.now(timezone.utc) - timedelta(days=cycle_days)
+
+    done_brands = db.query(Brand).filter(Brand.status == "done", Brand.is_public == True).all()
+
+    up_to_date = 0
+    outdated = []
+    for b in done_brands:
+        if b.last_refreshed and b.last_refreshed.replace(tzinfo=timezone.utc) >= cutoff:
+            up_to_date += 1
+        else:
+            days_since = (datetime.now(timezone.utc) - (b.last_refreshed.replace(tzinfo=timezone.utc) if b.last_refreshed else b.created_at.replace(tzinfo=timezone.utc))).days if (b.last_refreshed or b.created_at) else 999
+            outdated.append({
+                "id": b.id,
+                "name": b.name,
+                "url": b.url,
+                "last_refreshed": b.last_refreshed.isoformat() if b.last_refreshed else None,
+                "days_since": days_since,
+            })
+
+    return {
+        "total_brands": len(done_brands),
+        "up_to_date": up_to_date,
+        "outdated": len(outdated),
+        "outdated_brands": sorted(outdated, key=lambda x: -x["days_since"]),
+        "refresh_cycle_days": cycle_days,
+    }
+
+
+class RefreshRequest(BaseModel):
+    batch_size: int = 10
+
+
+@admin_router.post("/refresh-outdated")
+def refresh_outdated(body: RefreshRequest, db: Session = Depends(get_db)):
+    settings = _load_settings()
+    cycle_days = settings["refresh_cycle_days"]
+    cutoff = datetime.now(timezone.utc) - timedelta(days=cycle_days)
+
+    outdated = db.query(Brand).filter(
+        Brand.status == "done",
+        Brand.is_public == True,
+    ).all()
+
+    to_refresh = []
+    for b in outdated:
+        if not b.last_refreshed or b.last_refreshed.replace(tzinfo=timezone.utc) < cutoff:
+            to_refresh.append({"name": b.name or "", "url": b.url, "category": b.category or ""})
+        if len(to_refresh) >= body.batch_size:
+            break
+
+    if not to_refresh:
+        return {"message": "No outdated brands", "total": 0}
+
+    batch_queue.max_concurrent = settings["max_concurrent"]
+    task_id = batch_queue.start(to_refresh)
+    return {"task_id": task_id, "total": len(to_refresh), "message": f"Refreshing {len(to_refresh)} brands"}
+
+
+# ============================================================
+# Dashboard
+# ============================================================
+
+
+@admin_router.get("/dashboard")
+def get_dashboard(db: Session = Depends(get_db)):
+    settings = _load_settings()
+    cycle_days = settings["refresh_cycle_days"]
+    cutoff = datetime.now(timezone.utc) - timedelta(days=cycle_days)
+
+    total_brands = db.query(Brand).filter(Brand.status == "done").count()
+
+    by_category = (
+        db.query(Brand.category, func.count(Brand.id))
+        .filter(Brand.status == "done", Brand.category.isnot(None))
+        .group_by(Brand.category)
+        .all()
+    )
+
+    by_status = {}
+    for status in ["done", "processing", "error", "pending"]:
+        by_status[status] = db.query(Brand).filter(Brand.status == status).count()
+
+    recent = (
+        db.query(Brand)
+        .order_by(Brand.created_at.desc())
+        .limit(10)
+        .all()
+    )
+
+    failed = (
+        db.query(Brand)
+        .filter(Brand.status == "error")
+        .order_by(Brand.created_at.desc())
+        .limit(10)
+        .all()
+    )
+
+    outdated_count = 0
+    for b in db.query(Brand).filter(Brand.status == "done").all():
+        if not b.last_refreshed or b.last_refreshed.replace(tzinfo=timezone.utc) < cutoff:
+            outdated_count += 1
+
+    total_api_calls = db.query(func.sum(ApiCallLog.call_count)).scalar() or 0
+
+    queue_status = batch_queue.status()
+
+    return {
+        "total_brands": total_brands,
+        "brands_by_category": [{"name": name, "count": count} for name, count in by_category],
+        "brands_by_status": by_status,
+        "recent_brands": [
+            {"name": b.name, "created_at": b.created_at.isoformat() if b.created_at else None, "status": b.status}
+            for b in recent
+        ],
+        "failed_brands": [
+            {"name": b.name, "error_message": b.error_message, "created_at": b.created_at.isoformat() if b.created_at else None}
+            for b in failed
+        ],
+        "outdated_count": outdated_count,
+        "queue_status": {
+            "running": queue_status["processing"],
+            "queued": queue_status["queued"],
+            "paused": queue_status["paused"],
+        },
+        "total_api_calls": total_api_calls,
+    }

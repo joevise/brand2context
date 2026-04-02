@@ -1,0 +1,727 @@
+[
+  {
+    "name": "丰田",
+    "url": "https://www.toyota.com.cn",
+    "category": "汽车"
+  },
+  {
+    "name": "本田",
+    "url": "https://www.honda.com.cn",
+    "category": "汽车"
+  },
+  {
+    "name": "大众",
+    "url": "https://www.vw.com.cn",
+    "category": "汽车"
+  },
+  {
+    "name": "宝马",
+    "url": "https://www.bmw.com.cn",
+    "category": "汽车"
+  },
+  {
+    "name": "奔驰",
+    "url": "https://www.mercedes-benz.com.cn",
+    "category": "汽车"
+  },
+  {
+    "name": "奥迪",
+    "url": "https://www.audi.cn",
+    "category": "汽车"
+  },
+  {
+    "name": "特斯拉",
+    "url": "https://www.tesla.com",
+    "category": "汽车"
+  },
+  {
+    "name": "福特",
+    "url": "https://www.ford.com",
+    "category": "汽车"
+  },
+  {
+    "name": "雪佛兰",
+    "url": "https://www.chevrolet.com",
+    "category": "汽车"
+  },
+  {
+    "name": "保时捷",
+    "url": "https://www.porsche.com",
+    "category": "汽车"
+  },
+  {
+    "name": "法拉利",
+    "url": "https://www.ferrari.com",
+    "category": "汽车"
+  },
+  {
+    "name": "兰博基尼",
+    "url": "https://www.lamborghini.com",
+    "category": "汽车"
+  },
+  {
+    "name": "日产",
+    "url": "https://www.nissan.com.cn",
+    "category": "汽车"
+  },
+  {
+    "name": "现代",
+    "url": "https://www.hyundai.com",
+    "category": "汽车"
+  },
+  {
+    "name": "起亚",
+    "url": "https://www.kia.com",
+    "category": "汽车"
+  },
+  {
+    "name": "吉利",
+    "url": "https://www.geely.com",
+    "category": "汽车"
+  },
+  {
+    "name": "比亚迪",
+    "url": "https://www.byd.com",
+    "category": "汽车"
+  },
+  {
+    "name": "长城",
+    "url": "https://www.gwm.com.cn",
+    "category": "汽车"
+  },
+  {
+    "name": "蔚来",
+    "url": "https://www.nio.cn",
+    "category": "汽车"
+  },
+  {
+    "name": "小鹏",
+    "url": "https://www.xpeng.com",
+    "category": "汽车"
+  },
+  {
+    "name": "Nike",
+    "url": "https://www.nike.com",
+    "category": "运动户外"
+  },
+  {
+    "name": "Adidas",
+    "url": "https://www.adidas.com",
+    "category": "运动户外"
+  },
+  {
+    "name": "Puma",
+    "url": "https://global.puma.com",
+    "category": "运动户外"
+  },
+  {
+    "name": "Under Armour",
+    "url": "https://www.underarmour.com",
+    "category": "运动户外"
+  },
+  {
+    "name": "The North Face",
+    "url": "https://www.thenorthface.com",
+    "category": "运动户外"
+  },
+  {
+    "name": "Columbia Sportswear",
+    "url": "https://www.columbia.com",
+    "category": "运动户外"
+  },
+  {
+    "name": "Patagonia",
+    "url": "https://www.patagonia.com",
+    "category": "运动户外"
+  },
+  {
+    "name": "Salomon",
+    "url": "https://www.salomon.com",
+    "category": "运动户外"
+  },
+  {
+    "name": "Arc'teryx",
+    "url": "https://www.arcteryx.com",
+    "category": "运动户外"
+  },
+  {
+    "name": "Merrell",
+    "url": "https://www.merrell.com",
+    "category": "运动户外"
+  },
+  {
+    "name": "Decathlon",
+    "url": "https://www.decathlon.com",
+    "category": "运动户外"
+  },
+  {
+    "name": "New Balance",
+    "url": "https://www.newbalance.com",
+    "category": "运动户外"
+  },
+  {
+    "name": "Asics",
+    "url": "https://www.asics.com",
+    "category": "运动户外"
+  },
+  {
+    "name": "Fila",
+    "url": "https://www.fila.com",
+    "category": "运动户外"
+  },
+  {
+    "name": "Li-Ning",
+    "url": "https://www.lining.com",
+    "category": "运动户外"
+  },
+  {
+    "name": "Anta",
+    "url": "https://www.anta.com",
+    "category": "运动户外"
+  },
+  {
+    "name": "Xtep",
+    "url": "https://www.xtep.com",
+    "category": "运动户外"
+  },
+  {
+    "name": "361°",
+    "url": "https://www.361.com",
+    "category": "运动户外"
+  },
+  {
+    "name": "Peak",
+    "url": "https://www.peaksport.com",
+    "category": "运动户外"
+  },
+  {
+    "name": "Toread",
+    "url": "https://www.toread.com",
+    "category": "运动户外"
+  },
+  {
+    "name": "华润医药",
+    "url": "https://www.crpharm.com",
+    "category": "医药健康"
+  },
+  {
+    "name": "九芝堂",
+    "url": "https://www.jiuzhitang.com",
+    "category": "医药健康"
+  },
+  {
+    "name": "云南白药",
+    "url": "https://www.yunnanbaiyao.com",
+    "category": "医药健康"
+  },
+  {
+    "name": "华润三九",
+    "url": "https://www.999.com.cn",
+    "category": "医药健康"
+  },
+  {
+    "name": "同仁堂",
+    "url": "https://www.tongrentangs.com",
+    "category": "医药健康"
+  },
+  {
+    "name": "康美药业",
+    "url": "https://www.kangmei.com.cn",
+    "category": "医药健康"
+  },
+  {
+    "name": "国药集团",
+    "url": "https://www.sinopharm.com",
+    "category": "医药健康"
+  },
+  {
+    "name": "上海医药",
+    "url": "https://www.sphchina.com",
+    "category": "医药健康"
+  },
+  {
+    "name": "扬子江药业",
+    "url": "https://www.yangzijiang.com",
+    "category": "医药健康"
+  },
+  {
+    "name": "步长制药",
+    "url": "https://www.bcpharma.com.cn",
+    "category": "医药健康"
+  },
+  {
+    "name": "Pfizer",
+    "url": "https://www.pfizer.com",
+    "category": "医药健康"
+  },
+  {
+    "name": "Johnson & Johnson",
+    "url": "https://www.jnj.com",
+    "category": "医药健康"
+  },
+  {
+    "name": "Novartis",
+    "url": "https://www.novartis.com",
+    "category": "医药健康"
+  },
+  {
+    "name": "Roche",
+    "url": "https://www.roche.com",
+    "category": "医药健康"
+  },
+  {
+    "name": "Merck & Co",
+    "url": "https://www.merck.com",
+    "category": "医药健康"
+  },
+  {
+    "name": "GSK",
+    "url": "https://www.gsk.com",
+    "category": "医药健康"
+  },
+  {
+    "name": "Sanofi",
+    "url": "https://www.sanofi.com",
+    "category": "医药健康"
+  },
+  {
+    "name": "Bayer",
+    "url": "https://www.bayer.com",
+    "category": "医药健康"
+  },
+  {
+    "name": "AbbVie",
+    "url": "https://www.abbvie.com",
+    "category": "医药健康"
+  },
+  {
+    "name": "Amgen",
+    "url": "https://www.amgen.com",
+    "category": "医药健康"
+  },
+  {
+    "name": "新东方",
+    "url": "https://www.xdf.cn",
+    "category": "教育"
+  },
+  {
+    "name": "好未来",
+    "url": "https://www.tal.com",
+    "category": "教育"
+  },
+  {
+    "name": "学而思",
+    "url": "https://www.xueersi.com",
+    "category": "教育"
+  },
+  {
+    "name": "作业帮",
+    "url": "https://www.zuoyebang.com",
+    "category": "教育"
+  },
+  {
+    "name": "一起教育科技",
+    "url": "https://www.17zuoye.com",
+    "category": "教育"
+  },
+  {
+    "name": "51Talk",
+    "url": "https://www.51talk.com",
+    "category": "教育"
+  },
+  {
+    "name": "VIPKID",
+    "url": "https://www.vipkid.com.cn",
+    "category": "教育"
+  },
+  {
+    "name": "网易云课堂",
+    "url": "https://study.163.com",
+    "category": "教育"
+  },
+  {
+    "name": "沪江",
+    "url": "https://www.hujiang.com",
+    "category": "教育"
+  },
+  {
+    "name": "尚德机构",
+    "url": "https://www.shangde.com",
+    "category": "教育"
+  },
+  {
+    "name": "Coursera",
+    "url": "https://www.coursera.org",
+    "category": "教育"
+  },
+  {
+    "name": "edX",
+    "url": "https://www.edx.org",
+    "category": "教育"
+  },
+  {
+    "name": "Udemy",
+    "url": "https://www.udemy.com",
+    "category": "教育"
+  },
+  {
+    "name": "Khan Academy",
+    "url": "https://www.khanacademy.org",
+    "category": "教育"
+  },
+  {
+    "name": "Duolingo",
+    "url": "https://www.duolingo.com",
+    "category": "教育"
+  },
+  {
+    "name": "Babbel",
+    "url": "https://www.babbel.com",
+    "category": "教育"
+  },
+  {
+    "name": "EF Education First",
+    "url": "https://www.ef.com",
+    "category": "教育"
+  },
+  {
+    "name": "Pearson",
+    "url": "https://www.pearson.com",
+    "category": "教育"
+  },
+  {
+    "name": "Blackboard",
+    "url": "https://www.blackboard.com",
+    "category": "教育"
+  },
+  {
+    "name": "Chegg",
+    "url": "https://www.chegg.com",
+    "category": "教育"
+  },
+  {
+    "name": "华为",
+    "url": "https://www.huawei.com",
+    "category": "科技"
+  },
+  {
+    "name": "小米",
+    "url": "https://www.xiaomi.com",
+    "category": "科技"
+  },
+  {
+    "name": "大疆",
+    "url": "https://www.dji.com",
+    "category": "科技"
+  },
+  {
+    "name": "腾讯",
+    "url": "https://www.tencent.com",
+    "category": "科技"
+  },
+  {
+    "name": "阿里巴巴",
+    "url": "https://www.alibaba.com",
+    "category": "科技"
+  },
+  {
+    "name": "字节跳动",
+    "url": "https://www.bytedance.com",
+    "category": "科技"
+  },
+  {
+    "name": "百度",
+    "url": "https://www.baidu.com",
+    "category": "科技"
+  },
+  {
+    "name": "京东",
+    "url": "https://www.jd.com",
+    "category": "科技"
+  },
+  {
+    "name": "美团",
+    "url": "https://www.meituan.com",
+    "category": "科技"
+  },
+  {
+    "name": "网易",
+    "url": "https://www.163.com",
+    "category": "科技"
+  },
+  {
+    "name": "OPPO",
+    "url": "https://www.oppo.com",
+    "category": "科技"
+  },
+  {
+    "name": "vivo",
+    "url": "https://www.vivo.com.cn",
+    "category": "科技"
+  },
+  {
+    "name": "联想",
+    "url": "https://www.lenovo.com.cn",
+    "category": "科技"
+  },
+  {
+    "name": "科大讯飞",
+    "url": "https://www.iflytek.com",
+    "category": "科技"
+  },
+  {
+    "name": "MiniMax",
+    "url": "https://www.minimaxi.com",
+    "category": "科技"
+  },
+  {
+    "name": "Dify",
+    "url": "https://dify.ai",
+    "category": "科技"
+  },
+  {
+    "name": "Apple",
+    "url": "https://www.apple.com",
+    "category": "科技"
+  },
+  {
+    "name": "Google",
+    "url": "https://www.google.com",
+    "category": "科技"
+  },
+  {
+    "name": "Microsoft",
+    "url": "https://www.microsoft.com",
+    "category": "科技"
+  },
+  {
+    "name": "Samsung",
+    "url": "https://www.samsung.com",
+    "category": "科技"
+  },
+  {
+    "name": "茅台",
+    "url": "https://www.moutaichina.com",
+    "category": "消费品"
+  },
+  {
+    "name": "五粮液",
+    "url": "https://www.wuliangye.com.cn",
+    "category": "消费品"
+  },
+  {
+    "name": "东鹏饮料",
+    "url": "https://www.eastroc.com",
+    "category": "消费品"
+  },
+  {
+    "name": "元气森林",
+    "url": "https://www.genki-forest.com",
+    "category": "消费品"
+  },
+  {
+    "name": "农夫山泉",
+    "url": "https://www.nongfuspring.com",
+    "category": "消费品"
+  },
+  {
+    "name": "伊利",
+    "url": "https://www.yili.com",
+    "category": "消费品"
+  },
+  {
+    "name": "蒙牛",
+    "url": "https://www.mengniu.com.cn",
+    "category": "消费品"
+  },
+  {
+    "name": "可口可乐",
+    "url": "https://www.coca-cola.com.cn",
+    "category": "消费品"
+  },
+  {
+    "name": "青岛啤酒",
+    "url": "https://www.tsingtao.com.cn",
+    "category": "消费品"
+  },
+  {
+    "name": "海天味业",
+    "url": "https://www.haitian-food.com",
+    "category": "消费品"
+  },
+  {
+    "name": "海底捞",
+    "url": "https://www.haidilao.com",
+    "category": "餐饮连锁"
+  },
+  {
+    "name": "瑞幸咖啡",
+    "url": "https://www.luckincoffee.com",
+    "category": "餐饮连锁"
+  },
+  {
+    "name": "喜茶",
+    "url": "https://www.heytea.com",
+    "category": "餐饮连锁"
+  },
+  {
+    "name": "蜜雪冰城",
+    "url": "https://www.mxbc.com",
+    "category": "餐饮连锁"
+  },
+  {
+    "name": "星巴克中国",
+    "url": "https://www.starbucks.com.cn",
+    "category": "餐饮连锁"
+  },
+  {
+    "name": "麦当劳中国",
+    "url": "https://www.mcdonalds.com.cn",
+    "category": "餐饮连锁"
+  },
+  {
+    "name": "奈雪的茶",
+    "url": "https://www.naixue.com",
+    "category": "餐饮连锁"
+  },
+  {
+    "name": "老乡鸡",
+    "url": "https://www.lxjgroup.com",
+    "category": "餐饮连锁"
+  },
+  {
+    "name": "Louis Vuitton",
+    "url": "https://www.louisvuitton.cn",
+    "category": "奢侈品时尚"
+  },
+  {
+    "name": "Gucci",
+    "url": "https://www.gucci.cn",
+    "category": "奢侈品时尚"
+  },
+  {
+    "name": "Chanel",
+    "url": "https://www.chanel.cn",
+    "category": "奢侈品时尚"
+  },
+  {
+    "name": "Hermès",
+    "url": "https://www.hermes.cn",
+    "category": "奢侈品时尚"
+  },
+  {
+    "name": "Prada",
+    "url": "https://www.prada.com",
+    "category": "奢侈品时尚"
+  },
+  {
+    "name": "Dior",
+    "url": "https://www.dior.cn",
+    "category": "奢侈品时尚"
+  },
+  {
+    "name": "Zara",
+    "url": "https://www.zara.cn",
+    "category": "奢侈品时尚"
+  },
+  {
+    "name": "优衣库",
+    "url": "https://www.uniqlo.cn",
+    "category": "奢侈品时尚"
+  },
+  {
+    "name": "完美日记",
+    "url": "https://www.perfectdiary.com",
+    "category": "美妆个护"
+  },
+  {
+    "name": "花西子",
+    "url": "https://www.florasis.com",
+    "category": "美妆个护"
+  },
+  {
+    "name": "欧莱雅",
+    "url": "https://www.lorealparis.com.cn",
+    "category": "美妆个护"
+  },
+  {
+    "name": "雅诗兰黛",
+    "url": "https://www.esteelauder.com.cn",
+    "category": "美妆个护"
+  },
+  {
+    "name": "海尔",
+    "url": "https://www.haier.com",
+    "category": "家电家居"
+  },
+  {
+    "name": "美的",
+    "url": "https://www.midea.cn",
+    "category": "家电家居"
+  },
+  {
+    "name": "格力",
+    "url": "https://www.gree.com",
+    "category": "家电家居"
+  },
+  {
+    "name": "方太",
+    "url": "https://www.fotile.com",
+    "category": "家电家居"
+  },
+  {
+    "name": "中国平安",
+    "url": "https://www.pingan.com",
+    "category": "金融保险"
+  },
+  {
+    "name": "招商银行",
+    "url": "https://www.cmbchina.com",
+    "category": "金融保险"
+  },
+  {
+    "name": "蚂蚁集团",
+    "url": "https://www.antgroup.com",
+    "category": "金融保险"
+  },
+  {
+    "name": "淘宝",
+    "url": "https://www.taobao.com",
+    "category": "电商平台"
+  },
+  {
+    "name": "拼多多",
+    "url": "https://www.pinduoduo.com",
+    "category": "电商平台"
+  },
+  {
+    "name": "小红书",
+    "url": "https://www.xiaohongshu.com",
+    "category": "电商平台"
+  },
+  {
+    "name": "得物",
+    "url": "https://www.dewu.com",
+    "category": "电商平台"
+  },
+  {
+    "name": "米哈游",
+    "url": "https://www.mihoyo.com",
+    "category": "游戏娱乐"
+  },
+  {
+    "name": "腾讯游戏",
+    "url": "https://game.qq.com",
+    "category": "游戏娱乐"
+  },
+  {
+    "name": "网易游戏",
+    "url": "https://game.163.com",
+    "category": "游戏娱乐"
+  },
+  {
+    "name": "FuturX",
+    "url": "https://futurx.cc",
+    "category": "科技"
+  }
+]

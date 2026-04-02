@@ -21,6 +21,7 @@ from sqlalchemy import func
 from models import init_db, get_db, Brand, ApiCallLog, SessionLocal
 from tasks import run_brand_pipeline
 from mcp_server import handle_mcp_request
+from admin import admin_router
 
 MINIMAX_API_KEY = os.getenv(
     "MINIMAX_API_KEY",
@@ -28,7 +29,7 @@ MINIMAX_API_KEY = os.getenv(
 )
 
 
-app = FastAPI(title="Brand2Context API", version="0.1.0")
+app = FastAPI(title="Brand2Context API", version="0.2.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -37,6 +38,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(admin_router)
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data", "brands")
 os.makedirs(DATA_DIR, exist_ok=True)

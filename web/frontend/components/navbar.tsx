@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useTheme } from "./theme-provider";
-import { Sun, Moon, Zap, Search, Plus, ExternalLink } from "lucide-react";
+import { Sun, Moon, Zap, Search, Plus, ExternalLink, Settings } from "lucide-react";
 import { useState } from "react";
 
 export function Navbar() {
@@ -46,6 +46,13 @@ export function Navbar() {
           >
             <Search className="w-5 h-5" />
           </button>
+          <Link
+            href="/admin"
+            className="p-2 rounded-lg hover:bg-[var(--muted)] transition text-[var(--muted-foreground)]"
+            title="管理后台"
+          >
+            <Settings className="w-5 h-5" />
+          </Link>
           <button
             onClick={toggle}
             className="p-2 rounded-lg hover:bg-[var(--muted)] transition"
