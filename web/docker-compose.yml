@@ -14,6 +14,7 @@ services:
       - TAVILY_API_KEY=${TAVILY_API_KEY:-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}
       - LINK2CONTEXT_URL=${LINK2CONTEXT_URL:-http://67.209.190.54:8000}
       - SOCIAL_API_URL=http://host.docker.internal:8006
+      - METASO_API_KEY=${METASO_API_KEY:-mk-DA5C2447D54689CD7757A0C4AB162CA3}
       - DATABASE_URL=sqlite:///data/brand2context.db
       - CHROMA_HOST=brand2context-chroma
       - CHROMA_PORT=8005

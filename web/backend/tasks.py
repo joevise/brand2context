@@ -84,6 +84,21 @@ def run_brand_pipeline(brand_id: str, url: str):
 
         # Step 1: Try crawling the website
         pages = crawl_site(url)
+
+        # Step 1.5: If crawl failed, try Metaso Reader as fallback
+        if not pages:
+            print(f"⚠️ 爬取失败，尝试 Metaso Reader: {url}")
+            try:
+                from brand2context.web_searcher import metaso_read_url
+                content = metaso_read_url(url)
+                if content and len(content) > 100:
+                    pages = [{"url": url, "content": content}]
+                    print(f"   ✅ Metaso Reader 成功，获取 {len(content)} 字符")
+                else:
+                    print(f"   ⚠️ Metaso Reader 内容太少，跳过")
+            except Exception as e:
+                print(f"   ⚠️ Metaso Reader 失败: {e}")
+
         clues = extract_clues(pages, url)
 
         # Step 2: If crawl failed, infer brand name from URL/DB for search fallback
