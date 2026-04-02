@@ -2,24 +2,74 @@
 
 import json
 import os
+import re
 import sys
 import traceback
 from datetime import datetime, timezone
+from urllib.parse import urlparse
 
-# Add parent directories to path so we can import brand2context
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from models import SessionLocal, Brand
+from models import SessionLocal, Brand, generate_slug
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data", "brands")
 os.makedirs(DATA_DIR, exist_ok=True)
+
+
+def _fetch_logo(url: str) -> str:
+    logo_url = None
+    try:
+        domain = urlparse(url).netloc
+        if domain.startswith("www."):
+            domain = domain[4:]
+
+        import httpx
+
+        clearbit_url = f"https://logo.clearbit.com/{domain}"
+        resp = httpx.get(clearbit_url, timeout=10.0, follow_redirects=True)
+        if resp.status_code == 200:
+            logo_url = clearbit_url
+    except Exception:
+        pass
+
+    if not logo_url:
+        try:
+            import httpx
+
+            resp = httpx.get(url, timeout=10.0, follow_redirects=True)
+            html = resp.text
+
+            og_image = re.search(
+                r'<meta[^>]*property=["\']og:image["\'][^>]*content=["\']([^"\']+)["\']',
+                html,
+                re.I,
+            )
+            if og_image:
+                logo_url = og_image.group(1)
+            else:
+                icons = re.findall(
+                    r'<link[^>]*rel=["\'](?:icon|shortcut icon)["\'][^>]*href=["\']([^"\']+)["\']',
+                    html,
+                    re.I,
+                )
+                if icons:
+                    icon_href = icons[0]
+                    if icon_href.startswith("http"):
+                        logo_url = icon_href
+                    elif icon_href.startswith("//"):
+                        logo_url = "https:" + icon_href
+                    elif icon_href.startswith("/"):
+                        logo_url = f"{urlparse(url).scheme}://{urlparse(url).netloc}{icon_href}"
+        except Exception:
+            pass
+
+    return logo_url
 
 
 def run_brand_pipeline(brand_id: str, url: str):
     """Run the brand2context pipeline for a given URL."""
     db = SessionLocal()
     try:
-        # Update status to processing
         brand = db.query(Brand).filter(Brand.id == brand_id).first()
         if not brand:
             return
@@ -27,29 +77,28 @@ def run_brand_pipeline(brand_id: str, url: str):
         brand.updated_at = datetime.now(timezone.utc)
         db.commit()
 
-        # Import and run pipeline
         from brand2context.crawler import crawl_site
         from brand2context.clue_extractor import extract_clues
         from brand2context.web_searcher import search_expand
         from brand2context.structurer import structure_brand
 
-        # Step 1: Crawl
         pages = crawl_site(url)
-
-        # Step 2: Extract clues
         clues = extract_clues(pages, url)
-
-        # Step 3: Web search expansion
         search_results = search_expand(clues)
 
-        # Step 3.5: Social media crawl (通过 HTTP 调用容器外的 social API)
         social_results = []
         brand_name_for_social = clues.get("brand_name", "")
         if brand_name_for_social:
             try:
                 import httpx
-                social_api_url = os.getenv("SOCIAL_API_URL", "http://host.docker.internal:8006")
-                resp = httpx.post(f"{social_api_url}/api/social/crawl/{brand_name_for_social}", timeout=300)
+
+                social_api_url = os.getenv(
+                    "SOCIAL_API_URL", "http://host.docker.internal:8006"
+                )
+                resp = httpx.post(
+                    f"{social_api_url}/api/social/crawl/{brand_name_for_social}",
+                    timeout=300,
+                )
                 if resp.status_code == 200:
                     data = resp.json()
                     social_results = data.get("results", [])
@@ -59,7 +108,6 @@ def run_brand_pipeline(brand_id: str, url: str):
             except Exception as e:
                 print(f"⚠️ 社交媒体抓取跳过: {e}")
 
-        # Step 4: Structure
         if not pages and not search_results:
             brand.status = "error"
             brand.error_message = "No data collected from URL"
@@ -69,19 +117,26 @@ def run_brand_pipeline(brand_id: str, url: str):
 
         result = structure_brand(url, pages, clues, search_results, social_results)
 
-        # Save JSON
         output_path = os.path.join(DATA_DIR, f"{brand_id}.json")
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump(result, f, ensure_ascii=False, indent=2)
 
-        # Update brand record
         brand_name = result.get("identity", {}).get("name", "Unknown Brand")
         brand.name = brand_name
+        brand.slug = generate_slug(brand_name, db)
+        brand.description = result.get("identity", {}).get("tagline", "") or result.get(
+            "identity", {}
+        ).get("positioning", "")
         brand.status = "done"
         brand.updated_at = datetime.now(timezone.utc)
+        brand.last_refreshed = datetime.now(timezone.utc)
         db.commit()
 
-        # Index in ChromaDB
+        logo_url = _fetch_logo(url)
+        if logo_url:
+            brand.logo_url = logo_url
+            db.commit()
+
         try:
             from vector import index_brand
 

@@ -5,8 +5,10 @@ import os
 import uuid
 import threading
 import copy
+import re
 from datetime import datetime, timezone
 from typing import Optional
+from urllib.parse import urlparse
 
 import httpx
 from fastapi import FastAPI, Depends, HTTPException, Request
@@ -14,6 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from models import init_db, get_db, Brand, ApiCallLog, SessionLocal
 from tasks import run_brand_pipeline
@@ -50,6 +53,8 @@ def startup():
 
 class BrandCreate(BaseModel):
     url: str
+    category: Optional[str] = None
+    slug: Optional[str] = None
 
 
 class BrandResponse(BaseModel):
@@ -60,9 +65,25 @@ class BrandResponse(BaseModel):
     error_message: Optional[str] = None
     created_at: str
     updated_at: str
+    logo_url: Optional[str] = None
+    category: Optional[str] = None
+    slug: Optional[str] = None
+    description: Optional[str] = None
+    is_public: bool = True
 
     class Config:
         from_attributes = True
+
+
+class BrandSearchResponse(BaseModel):
+    brands: list
+    total: int
+    page: int
+    per_page: int
+
+
+class BatchBrandCreate(BaseModel):
+    brands: list
 
 
 def brand_to_response(b: Brand) -> dict:
@@ -74,6 +95,11 @@ def brand_to_response(b: Brand) -> dict:
         "error_message": b.error_message,
         "created_at": b.created_at.isoformat() if b.created_at else None,
         "updated_at": b.updated_at.isoformat() if b.updated_at else None,
+        "logo_url": b.logo_url,
+        "category": b.category,
+        "slug": b.slug,
+        "description": b.description,
+        "is_public": b.is_public if b.is_public is not None else True,
     }
 
 
@@ -87,12 +113,11 @@ def create_brand(body: BrandCreate, db: Session = Depends(get_db)):
         url = "https://" + url
 
     brand_id = str(uuid.uuid4())
-    brand = Brand(id=brand_id, url=url, status="pending")
+    brand = Brand(id=brand_id, url=url, status="pending", category=body.category)
     db.add(brand)
     db.commit()
     db.refresh(brand)
 
-    # Start background task
     thread = threading.Thread(
         target=run_brand_pipeline, args=(brand_id, url), daemon=True
     )
@@ -189,6 +214,208 @@ def search_brand_endpoint(brand_id: str, q: str = "", db: Session = Depends(get_
         return {"documents": [], "distances": [], "metadatas": []}
     except Exception as e:
         return {"documents": [], "distances": [], "metadatas": [], "error": str(e)}
+
+
+# --- Brand Search ---
+@app.get("/api/brands/search")
+def search_brands(
+    q: str = "",
+    category: Optional[str] = None,
+    page: int = 1,
+    per_page: int = 20,
+    db: Session = Depends(get_db),
+):
+    query = db.query(Brand).filter(Brand.status == "done", Brand.is_public == True)
+
+    if q:
+        query = query.filter(Brand.name.ilike(f"%{q}%"))
+    if category:
+        query = query.filter(Brand.category == category)
+
+    total = query.count()
+    brands = (
+        query.order_by(Brand.created_at.desc())
+        .offset((page - 1) * per_page)
+        .limit(per_page)
+        .all()
+    )
+
+    return {
+        "brands": [
+            {
+                "id": b.id,
+                "name": b.name,
+                "slug": b.slug,
+                "logo_url": b.logo_url,
+                "category": b.category,
+                "description": b.description,
+                "url": b.url,
+            }
+            for b in brands
+        ],
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+    }
+
+
+# --- Get Brand by Slug ---
+@app.get("/api/brands/by-slug/{slug}")
+def get_brand_by_slug(slug: str, db: Session = Depends(get_db)):
+    brand = db.query(Brand).filter(Brand.slug == slug).first()
+    if not brand:
+        raise HTTPException(status_code=404, detail="Brand not found")
+
+    _record_call(brand.id)
+
+    result = brand_to_response(brand)
+    json_path = os.path.join(DATA_DIR, f"{brand.id}.json")
+    if os.path.exists(json_path):
+        with open(json_path, "r", encoding="utf-8") as f:
+            result["data"] = json.load(f)
+    return result
+
+
+# --- Categories List ---
+@app.get("/api/categories")
+def list_categories(db: Session = Depends(get_db)):
+    brands = (
+        db.query(Brand.category, func.count(Brand.id))
+        .filter(
+            Brand.status == "done", Brand.is_public == True, Brand.category.isnot(None)
+        )
+        .group_by(Brand.category)
+        .all()
+    )
+
+    return {"categories": [{"name": name, "count": count} for name, count in brands]}
+
+
+# --- Stats Overview ---
+@app.get("/api/stats/overview")
+def get_stats_overview(db: Session = Depends(get_db)):
+    total_brands = (
+        db.query(Brand).filter(Brand.status == "done", Brand.is_public == True).count()
+    )
+    total_categories = (
+        db.query(Brand.category)
+        .filter(
+            Brand.status == "done", Brand.is_public == True, Brand.category.isnot(None)
+        )
+        .distinct()
+        .count()
+    )
+    total_api_calls = (
+        db.query(func.sum(ApiCallLog.call_count))
+        .filter(
+            ApiCallLog.brand_id.in_(
+                db.query(Brand.id).filter(
+                    Brand.status == "done", Brand.is_public == True
+                )
+            )
+        )
+        .scalar()
+        or 0
+    )
+
+    return {
+        "total_brands": total_brands,
+        "total_categories": total_categories,
+        "total_api_calls": total_api_calls,
+    }
+
+
+# --- Fetch Logo ---
+@app.post("/api/brands/{brand_id}/fetch-logo")
+def fetch_brand_logo(brand_id: str, db: Session = Depends(get_db)):
+    brand = db.query(Brand).filter(Brand.id == brand_id).first()
+    if not brand:
+        raise HTTPException(status_code=404, detail="Brand not found")
+
+    logo_url = None
+
+    try:
+        from urllib.parse import urlparse
+
+        domain = urlparse(brand.url).netloc
+        if domain.startswith("www."):
+            domain = domain[4:]
+
+        clearbit_url = f"https://logo.clearbit.com/{domain}"
+        resp = httpx.get(clearbit_url, timeout=10.0, follow_redirects=True)
+        if resp.status_code == 200:
+            logo_url = clearbit_url
+    except Exception:
+        pass
+
+    if not logo_url:
+        try:
+            resp = httpx.get(brand.url, timeout=10.0, follow_redirects=True)
+            html = resp.text
+
+            import re
+
+            og_image = re.search(
+                r'<meta[^>]*property=["\']og:image["\'][^>]*content=["\']([^"\']+)["\']',
+                html,
+                re.I,
+            )
+            if og_image:
+                logo_url = og_image.group(1)
+            else:
+                icons = re.findall(
+                    r'<link[^>]*rel=["\'](?:icon|shortcut icon)["\'][^>]*href=["\']([^"\']+)["\']',
+                    html,
+                    re.I,
+                )
+                if icons:
+                    icon_href = icons[0]
+                    if icon_href.startswith("http"):
+                        logo_url = icon_href
+                    elif icon_href.startswith("//"):
+                        logo_url = "https:" + icon_href
+                    elif icon_href.startswith("/"):
+                        logo_url = f"{urlparse(brand.url).scheme}://{urlparse(brand.url).netloc}{icon_href}"
+        except Exception:
+            pass
+
+    if logo_url:
+        brand.logo_url = logo_url
+        db.commit()
+
+    return {"logo_url": logo_url, "brand_id": brand_id}
+
+
+# --- Batch Create Brands ---
+@app.post("/api/brands/batch")
+def batch_create_brands(body: BatchBrandCreate, db: Session = Depends(get_db)):
+    created_ids = []
+
+    for item in body.brands:
+        url = item.get("url", "")
+        if not url:
+            continue
+        if not url.startswith("http"):
+            url = "https://" + url
+
+        brand_id = str(uuid.uuid4())
+        brand = Brand(
+            id=brand_id,
+            url=url,
+            status="pending",
+            category=item.get("category"),
+        )
+        db.add(brand)
+        db.commit()
+
+        thread = threading.Thread(
+            target=run_brand_pipeline, args=(brand_id, url), daemon=True
+        )
+        thread.start()
+
+        created_ids.append(brand_id)
+
+    return {"created_ids": created_ids}
 
 
 # --- Helper: record API call ---

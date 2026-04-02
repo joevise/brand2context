@@ -9,6 +9,11 @@ export interface Brand {
   created_at: string;
   updated_at: string;
   data?: any;
+  logo_url?: string;
+  category?: string;
+  slug?: string;
+  description?: string;
+  is_public?: boolean;
 }
 
 export async function createBrand(url: string): Promise<Brand> {
@@ -85,5 +90,55 @@ export async function searchBrand(id: string, query: string): Promise<{ document
 export async function getBrandStats(id: string): Promise<{ brand_id: string; call_count: number; last_accessed: string | null }> {
   const res = await fetch(`${API_URL}/api/brands/${id}/stats`, { cache: "no-store" });
   if (!res.ok) throw new Error("Failed to fetch stats");
+  return res.json();
+}
+
+export async function searchBrands(
+  q: string,
+  category?: string,
+  page?: number,
+  perPage?: number
+): Promise<{ brands: Brand[]; total: number; page: number; per_page: number }> {
+  const params = new URLSearchParams();
+  if (q) params.set("q", q);
+  if (category) params.set("category", category);
+  if (page) params.set("page", page.toString());
+  if (perPage) params.set("per_page", perPage.toString());
+  const res = await fetch(`${API_URL}/api/brands/search?${params}`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Failed to search brands");
+  return res.json();
+}
+
+export async function getCategories(): Promise<{ categories: { name: string; count: number }[] }> {
+  const res = await fetch(`${API_URL}/api/categories`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Failed to fetch categories");
+  return res.json();
+}
+
+export async function getStatsOverview(): Promise<{
+  total_brands: number;
+  total_categories: number;
+  total_api_calls: number;
+}> {
+  const res = await fetch(`${API_URL}/api/stats/overview`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Failed to fetch stats");
+  return res.json();
+}
+
+export async function getBrandBySlug(slug: string): Promise<Brand> {
+  const res = await fetch(`${API_URL}/api/brands/slug/${slug}`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Failed to fetch brand by slug");
+  return res.json();
+}
+
+export async function batchCreateBrands(
+  brands: { url: string; category?: string; slug?: string }[]
+): Promise<{ brand_ids: string[] }> {
+  const res = await fetch(`${API_URL}/api/brands/batch`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ brands }),
+  });
+  if (!res.ok) throw new Error("Failed to batch create brands");
   return res.json();
 }
