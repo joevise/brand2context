@@ -115,7 +115,11 @@ def _save_seeds(seeds):
 
 
 @admin_router.get("/seeds")
-def list_seeds(category: Optional[str] = None, db: Session = Depends(get_db), current_user: User = Depends(get_current_admin_user)):
+def list_seeds(
+    category: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
     seeds = _load_seeds()
     if category:
         seeds = [s for s in seeds if s.get("category") == category]
@@ -142,8 +146,14 @@ def list_seeds(category: Optional[str] = None, db: Session = Depends(get_db), cu
         if brand:
             entry["brand_id"] = brand.id
             entry["status"] = brand.status
-            entry["last_refreshed"] = brand.last_refreshed.isoformat() if brand.last_refreshed else None
-            if brand.status == "done" and brand.last_refreshed and brand.last_refreshed.replace(tzinfo=timezone.utc) < cutoff:
+            entry["last_refreshed"] = (
+                brand.last_refreshed.isoformat() if brand.last_refreshed else None
+            )
+            if (
+                brand.status == "done"
+                and brand.last_refreshed
+                and brand.last_refreshed.replace(tzinfo=timezone.utc) < cutoff
+            ):
                 entry["status"] = "outdated"
         else:
             entry["status"] = "new"
@@ -190,7 +200,9 @@ class AIGenerateRequest(BaseModel):
 
 
 @admin_router.post("/seeds/ai-generate")
-def ai_generate_seeds(body: AIGenerateRequest, current_user: User = Depends(get_current_admin_user)):
+def ai_generate_seeds(
+    body: AIGenerateRequest, current_user: User = Depends(get_current_admin_user)
+):
     prompt = f"""列出"{body.category}"品类的{body.count}个知名品牌（中国品牌和在中国运营的国际品牌），JSON数组格式。
     每个品牌格式：{{"name":"品牌名","url":"https://官网","category":"{body.category}"}}
     要求：URL 必须是真实可访问的官网。只输出json数组，不要其他文字。"""
@@ -198,7 +210,10 @@ def ai_generate_seeds(body: AIGenerateRequest, current_user: User = Depends(get_
     try:
         resp = httpx.post(
             "https://api.minimax.chat/v1/text/chatcompletion_v2",
-            headers={"Authorization": f"Bearer {MINIMAX_API_KEY}", "Content-Type": "application/json"},
+            headers={
+                "Authorization": f"Bearer {MINIMAX_API_KEY}",
+                "Content-Type": "application/json",
+            },
             json={
                 "model": "MiniMax-M2.7",
                 "messages": [{"role": "user", "content": prompt}],
@@ -222,7 +237,11 @@ def ai_generate_seeds(body: AIGenerateRequest, current_user: User = Depends(get_
     for b in new_brands:
         url = b.get("url", "").rstrip("/")
         if url and url not in existing_urls:
-            entry = {"name": b.get("name", ""), "url": b.get("url", ""), "category": body.category}
+            entry = {
+                "name": b.get("name", ""),
+                "url": b.get("url", ""),
+                "category": body.category,
+            }
             seeds.append(entry)
             added.append(entry)
             existing_urls.add(url)
@@ -236,7 +255,9 @@ class SearchAddRequest(BaseModel):
 
 
 @admin_router.post("/seeds/search-add")
-def search_add_seed(body: SearchAddRequest, current_user: User = Depends(get_current_admin_user)):
+def search_add_seed(
+    body: SearchAddRequest, current_user: User = Depends(get_current_admin_user)
+):
     prompt = f"""找到"{body.brand_name}"这个品牌的官方网站URL。
     只返回JSON：{{"name":"品牌名","url":"https://官网"}}
     不要其他文字。"""
@@ -244,7 +265,10 @@ def search_add_seed(body: SearchAddRequest, current_user: User = Depends(get_cur
     try:
         resp = httpx.post(
             "https://api.minimax.chat/v1/text/chatcompletion_v2",
-            headers={"Authorization": f"Bearer {MINIMAX_API_KEY}", "Content-Type": "application/json"},
+            headers={
+                "Authorization": f"Bearer {MINIMAX_API_KEY}",
+                "Content-Type": "application/json",
+            },
             json={
                 "model": "MiniMax-M2.7",
                 "messages": [{"role": "user", "content": prompt}],
@@ -435,7 +459,11 @@ class BatchStartRequest(BaseModel):
 
 
 @admin_router.post("/batch/start")
-def start_batch(body: BatchStartRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_admin_user)):
+def start_batch(
+    body: BatchStartRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
     seeds = _load_seeds()
     if body.category:
         seeds = [s for s in seeds if s.get("category") == body.category]
@@ -511,7 +539,11 @@ class RetryDBRequest(BaseModel):
 
 
 @admin_router.post("/batch/retry-db-errors")
-def retry_db_errors(body: RetryDBRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_admin_user)):
+def retry_db_errors(
+    body: RetryDBRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
     """Retry all brands with status='error' in the database."""
     error_brands = (
         db.query(Brand)
@@ -645,7 +677,9 @@ def _retry_worker():
 
 
 @admin_router.get("/refresh-status")
-def get_refresh_status(db: Session = Depends(get_db), current_user: User = Depends(get_current_admin_user)):
+def get_refresh_status(
+    db: Session = Depends(get_db), current_user: User = Depends(get_current_admin_user)
+):
     settings = _load_settings()
     cycle_days = settings["refresh_cycle_days"]
     cutoff = datetime.now(timezone.utc) - timedelta(days=cycle_days)
@@ -698,7 +732,11 @@ class RefreshRequest(BaseModel):
 
 
 @admin_router.post("/refresh-outdated")
-def refresh_outdated(body: RefreshRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_admin_user)):
+def refresh_outdated(
+    body: RefreshRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
     settings = _load_settings()
     cycle_days = settings["refresh_cycle_days"]
     cutoff = datetime.now(timezone.utc) - timedelta(days=cycle_days)
@@ -742,7 +780,9 @@ def refresh_outdated(body: RefreshRequest, db: Session = Depends(get_db), curren
 
 
 @admin_router.get("/dashboard")
-def get_dashboard(db: Session = Depends(get_db), current_user: User = Depends(get_current_admin_user)):
+def get_dashboard(
+    db: Session = Depends(get_db), current_user: User = Depends(get_current_admin_user)
+):
     settings = _load_settings()
     cycle_days = settings["refresh_cycle_days"]
     cutoff = datetime.now(timezone.utc) - timedelta(days=cycle_days)
@@ -811,4 +851,265 @@ def get_dashboard(db: Session = Depends(get_db), current_user: User = Depends(ge
             "paused": queue_status["paused"],
         },
         "total_api_calls": total_api_calls,
+    }
+
+
+# ============================================================
+# Industry Management
+# ============================================================
+
+
+class IndustryLaunchRequest(BaseModel):
+    industry: str
+    count: int = 30
+
+
+@admin_router.post("/industry/launch")
+def launch_industry(
+    body: IndustryLaunchRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    prompt = f"""列出"{body.industry}"行业的{body.count}个知名品牌（中国品牌和在中国运营的国际品牌），JSON数组格式。
+    每个品牌格式：{{"name":"品牌名","url":"https://官网","category":"{body.industry}"}}
+    要求：URL 必须是真实可访问的官网。只输出json数组，不要其他文字。"""
+
+    try:
+        resp = httpx.post(
+            "https://api.minimax.chat/v1/text/chatcompletion_v2",
+            headers={
+                "Authorization": f"Bearer {MINIMAX_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": "MiniMax-M2.7",
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 4000,
+                "temperature": 0.2,
+            },
+            timeout=60.0,
+        )
+        content = resp.json()["choices"][0]["message"]["content"]
+        if "```json" in content:
+            content = content.split("```json")[1].split("```")[0]
+        elif "```" in content:
+            content = content.split("```")[1].split("```")[0]
+        new_brands = json.loads(content.strip())
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"AI generation failed: {str(e)}")
+
+    seeds = _load_seeds()
+    existing_urls = {s.get("url", "").rstrip("/") for s in seeds}
+    added = []
+    for b in new_brands:
+        url = b.get("url", "").rstrip("/")
+        if url and url not in existing_urls:
+            entry = {
+                "name": b.get("name", ""),
+                "url": b.get("url", ""),
+                "category": body.industry,
+            }
+            seeds.append(entry)
+            added.append(entry)
+            existing_urls.add(url)
+    _save_seeds(seeds)
+
+    settings = _load_settings()
+    cycle_days = settings["refresh_cycle_days"]
+    cutoff = datetime.now(timezone.utc) - timedelta(days=cycle_days)
+
+    all_brands = db.query(Brand).all()
+    url_map = {b.url.rstrip("/"): b for b in all_brands}
+
+    to_crawl = []
+    for entry in added:
+        url = entry.get("url", "").rstrip("/")
+        brand = url_map.get(url)
+        if brand is None:
+            to_crawl.append(entry)
+            url_map[url] = "pending"
+
+    if not to_crawl:
+        return {
+            "task_id": None,
+            "industry": body.industry,
+            "brands_added": len(added),
+            "brands_started": 0,
+            "message": "All brands already exist in database",
+        }
+
+    batch_queue.max_concurrent = settings["max_concurrent"]
+    task_id = batch_queue.start(to_crawl)
+
+    return {
+        "task_id": task_id,
+        "industry": body.industry,
+        "brands_added": len(added),
+        "brands_started": len(to_crawl),
+    }
+
+
+@admin_router.get("/industry/stats")
+def get_industry_stats(
+    db: Session = Depends(get_db), current_user: User = Depends(get_current_admin_user)
+):
+    seeds = _load_seeds()
+
+    cats = {}
+    for s in seeds:
+        c = s.get("category", "") or "未分类"
+        if c not in cats:
+            cats[c] = {"total": 0, "urls": set()}
+        cats[c]["total"] += 1
+        cats[c]["urls"].add(s.get("url", "").rstrip("/"))
+
+    all_brands = db.query(Brand).all()
+    url_to_brand = {b.url.rstrip("/"): b for b in all_brands}
+
+    stats = []
+    for cat_name, cat_data in cats.items():
+        done = 0
+        processing = 0
+        error = 0
+        pending = 0
+        last_updated = None
+
+        for url in cat_data["urls"]:
+            brand = url_to_brand.get(url)
+            if brand:
+                if brand.status == "done":
+                    done += 1
+                    if brand.updated_at and (
+                        last_updated is None or brand.updated_at > last_updated
+                    ):
+                        last_updated = brand.updated_at
+                elif brand.status == "processing":
+                    processing += 1
+                elif brand.status == "error":
+                    error += 1
+                elif brand.status == "pending":
+                    pending += 1
+            else:
+                pending += 1
+
+        total = cat_data["total"]
+        completion_rate = done / total if total > 0 else 0
+
+        stats.append(
+            {
+                "name": cat_name,
+                "total": total,
+                "done": done,
+                "processing": processing,
+                "error": error,
+                "pending": pending,
+                "completion_rate": round(completion_rate, 2),
+                "last_updated": last_updated.isoformat() if last_updated else None,
+            }
+        )
+
+    stats.sort(key=lambda x: -x["completion_rate"])
+
+    return {"industries": stats}
+
+
+class IndustryRetryRequest(BaseModel):
+    industry: str
+
+
+@admin_router.post("/industry/retry")
+def retry_industry(
+    body: IndustryRetryRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    error_brands = (
+        db.query(Brand)
+        .filter(Brand.status == "error", Brand.category == body.industry)
+        .all()
+    )
+
+    if not error_brands:
+        return {"message": "No error brands to retry", "count": 0}
+
+    to_crawl = []
+    for b in error_brands:
+        b.status = "pending"
+        b.error_message = None
+        b.updated_at = datetime.now(timezone.utc)
+        to_crawl.append(
+            {
+                "name": b.name or "",
+                "url": b.url,
+                "category": b.category or "",
+                "brand_id": b.id,
+            }
+        )
+    db.commit()
+
+    settings = _load_settings()
+    batch_queue.max_concurrent = settings["max_concurrent"]
+
+    batch_queue.task_id = str(uuid.uuid4())[:8]
+    batch_queue.completed = []
+    batch_queue.failed = []
+    batch_queue.running = {}
+    batch_queue.paused = False
+    batch_queue.total = len(to_crawl)
+
+    for item in to_crawl:
+        batch_queue.q.put(item)
+
+    if batch_queue._worker_thread is None or not batch_queue._worker_thread.is_alive():
+        batch_queue._worker_thread = threading.Thread(target=_retry_worker, daemon=True)
+        batch_queue._worker_thread.start()
+
+    return {
+        "message": f"Retrying {len(to_crawl)} error brands in {body.industry}",
+        "count": len(to_crawl),
+    }
+
+
+class IndustryRefreshRequest(BaseModel):
+    industry: str
+
+
+@admin_router.post("/industry/refresh")
+def refresh_industry(
+    body: IndustryRefreshRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    settings = _load_settings()
+    cycle_days = settings["refresh_cycle_days"]
+    cutoff = datetime.now(timezone.utc) - timedelta(days=cycle_days)
+
+    outdated = (
+        db.query(Brand)
+        .filter(
+            Brand.status == "done",
+            Brand.category == body.industry,
+        )
+        .all()
+    )
+
+    to_refresh = []
+    for b in outdated:
+        if (
+            not b.last_refreshed
+            or b.last_refreshed.replace(tzinfo=timezone.utc) < cutoff
+        ):
+            to_refresh.append(
+                {"name": b.name or "", "url": b.url, "category": b.category or ""}
+            )
+
+    if not to_refresh:
+        return {"message": "No outdated brands", "count": 0}
+
+    batch_queue.max_concurrent = settings["max_concurrent"]
+    task_id = batch_queue.start(to_refresh)
+    return {
+        "task_id": task_id,
+        "message": f"Refreshing {len(to_refresh)} brands in {body.industry}",
+        "count": len(to_refresh),
     }

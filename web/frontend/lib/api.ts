@@ -203,6 +203,17 @@ export interface AdminSettings {
   max_concurrent: number;
 }
 
+export interface IndustryStats {
+  name: string;
+  total: number;
+  done: number;
+  processing: number;
+  error: number;
+  pending: number;
+  completion_rate: number;
+  last_updated: string | null;
+}
+
 export async function getAdminDashboard(): Promise<AdminDashboard> {
   const res = await fetch(`${API_URL}/api/admin/dashboard`, {
     cache: "no-store",
@@ -341,6 +352,45 @@ export async function retryDBErrors(batchSize: number = 10): Promise<{ message: 
     body: JSON.stringify({ batch_size: batchSize }),
   });
   if (!res.ok) throw new Error("Failed to retry DB errors");
+  return res.json();
+}
+
+export async function launchIndustry(data: { industry: string; count: number }): Promise<{ task_id: string; industry: string; brands_added: number; brands_started: number }> {
+  const res = await fetch(`${API_URL}/api/admin/industry/launch`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error("Failed to launch industry");
+  return res.json();
+}
+
+export async function getIndustryStats(): Promise<{ industries: IndustryStats[] }> {
+  const res = await fetch(`${API_URL}/api/admin/industry/stats`, {
+    cache: "no-store",
+    headers: { ...getAuthHeaders() },
+  });
+  if (!res.ok) throw new Error("Failed to get industry stats");
+  return res.json();
+}
+
+export async function retryIndustry(industry: string): Promise<{ message: string; count: number }> {
+  const res = await fetch(`${API_URL}/api/admin/industry/retry`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+    body: JSON.stringify({ industry }),
+  });
+  if (!res.ok) throw new Error("Failed to retry industry");
+  return res.json();
+}
+
+export async function refreshIndustry(industry: string): Promise<{ message: string; count: number }> {
+  const res = await fetch(`${API_URL}/api/admin/industry/refresh`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+    body: JSON.stringify({ industry }),
+  });
+  if (!res.ok) throw new Error("Failed to refresh industry");
   return res.json();
 }
 

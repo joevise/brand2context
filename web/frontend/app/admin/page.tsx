@@ -22,6 +22,11 @@ import {
   AdminSettings,
   getMe,
   AuthUser,
+  launchIndustry,
+  getIndustryStats,
+  retryIndustry,
+  refreshIndustry,
+  IndustryStats,
 } from "@/lib/api";
 import {
   LayoutDashboard,
@@ -43,6 +48,8 @@ import {
   Settings,
   BarChart3,
   Shield,
+  Rocket,
+  Building2,
 } from "lucide-react";
 
 const STATUS_COLORS = {
@@ -286,7 +293,7 @@ function ManualAddModal({
 }
 
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState<"seeds" | "batch" | "refresh">("seeds");
+  const [activeTab, setActiveTab] = useState<"seeds" | "batch" | "refresh" | "industry">("seeds");
   const [dashboard, setDashboard] = useState<AdminDashboard | null>(null);
   const [seeds, setSeeds] = useState<Seed[]>([]);
   const [seedsTotal, setSeedsTotal] = useState(0);
@@ -301,10 +308,15 @@ export default function AdminPage() {
   const [searchAddOpen, setSearchAddOpen] = useState(false);
   const [manualAddOpen, setManualAddOpen] = useState(false);
   const [batchFilter, setBatchFilter] = useState<"new" | "outdated" | "all">("all");
+  const [batchCategory, setBatchCategory] = useState<string>("all");
   const [batchSize, setBatchSize] = useState(10);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
+  const [industryStats, setIndustryStats] = useState<IndustryStats[]>([]);
+  const [launchLoading, setLaunchLoading] = useState(false);
+  const [launchIndustryName, setLaunchIndustryName] = useState("");
+  const [launchCount, setLaunchCount] = useState(30);
 
   const fetchDashboard = useCallback(async () => {
     try {
@@ -346,6 +358,13 @@ export default function AdminPage() {
     } catch {}
   }, []);
 
+  const fetchIndustryStats = useCallback(async () => {
+    try {
+      const data = await getIndustryStats();
+      setIndustryStats(data.industries);
+    } catch {}
+  }, []);
+
   useEffect(() => {
     const checkAuth = async () => {
       try {
@@ -373,6 +392,9 @@ export default function AdminPage() {
     if (activeTab === "batch") {
       fetchBatchStatus();
       pollingRef.current = setInterval(fetchBatchStatus, 5000);
+    } else if (activeTab === "industry") {
+      fetchIndustryStats();
+      pollingRef.current = setInterval(fetchIndustryStats, 10000);
     } else if (pollingRef.current) {
       clearInterval(pollingRef.current);
       pollingRef.current = null;
@@ -380,13 +402,19 @@ export default function AdminPage() {
     return () => {
       if (pollingRef.current) clearInterval(pollingRef.current);
     };
-  }, [activeTab, fetchBatchStatus]);
+  }, [activeTab, fetchBatchStatus, fetchIndustryStats]);
 
   useEffect(() => {
     if (activeTab === "refresh") {
       fetchRefreshStatus();
     }
   }, [activeTab, fetchRefreshStatus]);
+
+  useEffect(() => {
+    if (activeTab === "industry") {
+      fetchIndustryStats();
+    }
+  }, [activeTab, fetchIndustryStats]);
 
   useEffect(() => {
     if (!loading && authChecked) {
@@ -397,7 +425,7 @@ export default function AdminPage() {
   const handleStartBatch = async () => {
     try {
       await startBatch({
-        category: batchFilter === "all" ? undefined : batchFilter === "new" ? undefined : batchFilter,
+        category: batchCategory === "all" ? undefined : batchCategory,
         batch_size: batchSize,
         filter: batchFilter,
       });
@@ -439,6 +467,46 @@ export default function AdminPage() {
     try {
       await updateAdminSettings(settings);
     } catch {}
+  };
+
+  const handleLaunchIndustry = async () => {
+    if (!launchIndustryName.trim()) return;
+    setLaunchLoading(true);
+    try {
+      const result = await launchIndustry({
+        industry: launchIndustryName.trim(),
+        count: launchCount,
+      });
+      alert(`已导入 ${result.brands_added} 个品牌并开始抓取 ${result.brands_started} 个`);
+      setLaunchIndustryName("");
+      fetchIndustryStats();
+      fetchDashboard();
+      fetchSeeds();
+    } catch {
+      alert("启动失败");
+    } finally {
+      setLaunchLoading(false);
+    }
+  };
+
+  const handleRetryIndustry = async (industry: string) => {
+    try {
+      const result = await retryIndustry(industry);
+      alert(result.message);
+      fetchIndustryStats();
+    } catch {
+      alert("重试失败");
+    }
+  };
+
+  const handleRefreshIndustryFn = async (industry: string) => {
+    try {
+      const result = await refreshIndustry(industry);
+      alert(result.message);
+      fetchIndustryStats();
+    } catch {
+      alert("刷新失败");
+    }
   };
 
   if (!authChecked) {
@@ -547,6 +615,34 @@ export default function AdminPage() {
           </div>
         </div>
 
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-medium text-gray-400">行业概览</h3>
+            <button
+              onClick={() => setActiveTab("industry")}
+              className="text-xs text-primary-400 hover:text-primary-300 transition"
+            >
+              查看全部
+            </button>
+          </div>
+          <div className="flex gap-3 overflow-x-auto pb-2">
+            {industryStats.slice(0, 10).map((industry) => (
+              <button
+                key={industry.name}
+                onClick={() => setActiveTab("industry")}
+                className="flex-shrink-0 rounded-xl border border-gray-700 bg-gray-800/50 p-3 min-w-[140px] hover:bg-gray-800/80 transition"
+              >
+                <div className="text-sm font-medium mb-2 truncate">{industry.name}</div>
+                <div className="text-lg font-bold text-green-400">{Math.round(industry.completion_rate * 100)}%</div>
+                <div className="text-xs text-gray-500">完成率</div>
+              </button>
+            ))}
+            {industryStats.length === 0 && (
+              <div className="text-sm text-gray-500 py-4">暂无行业数据</div>
+            )}
+          </div>
+        </div>
+
         <div className="grid grid-cols-3 gap-6 mb-8">
           <div className="col-span-2 bg-gray-900/50 rounded-xl p-4 border border-gray-800">
             <h3 className="text-sm font-medium text-gray-400 mb-4">品类分布</h3>
@@ -615,6 +711,17 @@ export default function AdminPage() {
             >
               <Database className="w-4 h-4 inline mr-2" />
               种子库管理
+            </button>
+            <button
+              onClick={() => setActiveTab("industry")}
+              className={`px-6 py-3 text-sm font-medium transition ${
+                activeTab === "industry"
+                  ? "text-primary-400 border-b-2 border-primary-400 bg-primary-950/20"
+                  : "text-gray-400 hover:text-gray-200"
+              }`}
+            >
+              <Building2 className="w-4 h-4 inline mr-2" />
+              行业管理
             </button>
             <button
               onClick={() => setActiveTab("batch")}
@@ -729,11 +836,139 @@ export default function AdminPage() {
               </div>
             )}
 
+            {activeTab === "industry" && (
+              <div>
+                <div className="mb-6 p-4 rounded-xl border border-gray-700 bg-gray-800/50">
+                  <h3 className="text-sm font-medium text-gray-300 mb-4">一键导入并抓取</h3>
+                  <div className="flex gap-3 items-end">
+                    <div className="flex-1">
+                      <label className="block text-xs text-gray-400 mb-2">行业名称</label>
+                      <input
+                        type="text"
+                        value={launchIndustryName}
+                        onChange={(e) => setLaunchIndustryName(e.target.value)}
+                        placeholder="如：新能源汽车、美妆护肤..."
+                        className="w-full px-3 py-2 rounded-lg bg-gray-900 border border-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600"
+                      />
+                    </div>
+                    <div className="w-32">
+                      <label className="block text-xs text-gray-400 mb-2">品牌数量</label>
+                      <input
+                        type="number"
+                        value={launchCount}
+                        onChange={(e) => setLaunchCount(Number(e.target.value))}
+                        min={10}
+                        max={100}
+                        className="w-full px-3 py-2 rounded-lg bg-gray-900 border border-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600"
+                      />
+                    </div>
+                    <button
+                      onClick={handleLaunchIndustry}
+                      disabled={launchLoading || !launchIndustryName.trim()}
+                      className="px-4 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 text-white font-medium text-sm transition disabled:opacity-50 flex items-center gap-2"
+                    >
+                      {launchLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+                      <Rocket className="w-4 h-4" />
+                      一键导入并抓取
+                    </button>
+                  </div>
+                </div>
+
+                {industryStats.length === 0 ? (
+                  <div className="text-center py-12 text-gray-500">
+                    <Building2 className="w-12 h-12 mx-auto mb-4 text-gray-600" />
+                    <p>还没有行业数据，在上方输入行业名称开始</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {industryStats.map((industry) => {
+                      const donePct = industry.completion_rate * 100;
+                      return (
+                        <div key={industry.name} className="rounded-xl border border-gray-700 bg-gray-800/50 p-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <h3 className="text-base font-semibold">{industry.name}</h3>
+                            <span className="text-xs text-gray-400">{donePct.toFixed(0)}%</span>
+                          </div>
+
+                          <div className="h-3 bg-gray-900 rounded-full overflow-hidden mb-3">
+                            <div
+                              className="h-full bg-green-500 rounded-full transition-all"
+                              style={{ width: `${donePct}%` }}
+                            />
+                          </div>
+
+                          <div className="flex items-center justify-between text-xs text-gray-400 mb-3">
+                            <span>完成 {industry.done} / 总 {industry.total}</span>
+                            <div className="flex gap-2">
+                              {industry.processing > 0 && (
+                                <span className="text-blue-400">处理中 {industry.processing}</span>
+                              )}
+                              {industry.error > 0 && (
+                                <span className="text-red-400">失败 {industry.error}</span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex gap-2 mb-2">
+                            {industry.error > 0 && (
+                              <button
+                                onClick={() => handleRetryIndustry(industry.name)}
+                                className="px-3 py-1.5 rounded-lg bg-red-600/20 text-red-400 border border-red-600/30 text-xs font-medium hover:bg-red-600/30 transition flex items-center gap-1"
+                              >
+                                <RotateCcw className="w-3 h-3" />
+                                重试失败
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleRefreshIndustryFn(industry.name)}
+                              className="px-3 py-1.5 rounded-lg bg-blue-600/20 text-blue-400 border border-blue-600/30 text-xs font-medium hover:bg-blue-600/30 transition flex items-center gap-1"
+                            >
+                              <RefreshCw className="w-3 h-3" />
+                              刷新过期
+                            </button>
+                            <button
+                              onClick={async () => {
+                                setBatchCategory(industry.name);
+                                setActiveTab("batch");
+                              }}
+                              className="px-3 py-1.5 rounded-lg bg-green-600/20 text-green-400 border border-green-600/30 text-xs font-medium hover:bg-green-600/30 transition flex items-center gap-1"
+                            >
+                              <Play className="w-3 h-3" />
+                              继续抓取
+                            </button>
+                          </div>
+
+                          {industry.last_updated && (
+                            <div className="text-xs text-gray-500">
+                              最后更新: {new Date(industry.last_updated).toLocaleString()}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
             {activeTab === "batch" && (
               <div>
-                <div className="grid grid-cols-4 gap-4 mb-6">
+                <div className="grid grid-cols-5 gap-4 mb-6">
                   <div>
-                    <label className="block text-xs text-gray-400 mb-2">品类筛选</label>
+                    <label className="block text-xs text-gray-400 mb-2">行业</label>
+                    <select
+                      value={batchCategory}
+                      onChange={(e) => setBatchCategory(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600"
+                    >
+                      <option value="all">全部</option>
+                      {seedsCategories.map((cat) => (
+                        <option key={cat.name} value={cat.name}>{cat.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-2">状态</label>
                     <select
                       value={batchFilter}
                       onChange={(e) => setBatchFilter(e.target.value as "new" | "outdated" | "all")}
