@@ -11,17 +11,21 @@ from typing import Optional
 from urllib.parse import urlparse
 
 import httpx
-from fastapi import FastAPI, Depends, HTTPException, Request
+import jwt
+import bcrypt
+from fastapi import FastAPI, Depends, HTTPException, Request, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
-from models import init_db, get_db, Brand, ApiCallLog, SessionLocal
+from models import init_db, get_db, Brand, ApiCallLog, User, SessionLocal
 from tasks import run_brand_pipeline
 from mcp_server import handle_mcp_request
 from admin import admin_router
+
+JWT_SECRET = os.getenv("JWT_SECRET", "brand2context-dev-secret")
 
 MINIMAX_API_KEY = os.getenv(
     "MINIMAX_API_KEY",
@@ -56,6 +60,7 @@ def startup():
 
 class BrandCreate(BaseModel):
     url: str
+    name: Optional[str] = None
     category: Optional[str] = None
     slug: Optional[str] = None
 
@@ -89,12 +94,32 @@ class BatchBrandCreate(BaseModel):
     brands: list
 
 
+class UserRegister(BaseModel):
+    email: str
+    password: str
+    name: str
+
+
+class UserLogin(BaseModel):
+    email: str
+    password: str
+
+
+class UserResponse(BaseModel):
+    id: str
+    email: str
+    name: Optional[str] = None
+    is_admin: bool = False
+    created_at: str
+
+
 def brand_to_response(b: Brand) -> dict:
     return {
         "id": b.id,
         "name": b.name,
         "url": b.url,
         "status": b.status,
+        "progress_step": b.progress_step if b.progress_step else "pending",
         "error_message": b.error_message,
         "created_at": b.created_at.isoformat() if b.created_at else None,
         "updated_at": b.updated_at.isoformat() if b.updated_at else None,
@@ -109,6 +134,87 @@ def brand_to_response(b: Brand) -> dict:
 # --- API Endpoints ---
 
 
+def get_current_user(
+    authorization: str = Header(None), db: Session = Depends(get_db)
+) -> User:
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    token = authorization.replace("Bearer ", "")
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+        user_id = payload.get("user_id")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Invalid token")
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+    return user
+
+
+def require_admin(current_user: User = Depends(get_current_user)) -> User:
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return current_user
+
+
+@app.post("/api/auth/register")
+def register(body: UserRegister, db: Session = Depends(get_db)):
+    existing = db.query(User).filter(User.email == body.email).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    password_hash = bcrypt.hashpw(body.password.encode(), bcrypt.gensalt()).decode()
+    user = User(email=body.email, password_hash=password_hash, name=body.name)
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    token = jwt.encode({"user_id": user.id}, JWT_SECRET, algorithm="HS256")
+    return {
+        "token": token,
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "name": user.name,
+            "is_admin": user.is_admin,
+            "created_at": user.created_at.isoformat() if user.created_at else None,
+        },
+    }
+
+
+@app.post("/api/auth/login")
+def login(body: UserLogin, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == body.email).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    if not bcrypt.checkpw(body.password.encode(), user.password_hash.encode()):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    token = jwt.encode({"user_id": user.id}, JWT_SECRET, algorithm="HS256")
+    return {
+        "token": token,
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "name": user.name,
+            "is_admin": user.is_admin,
+            "created_at": user.created_at.isoformat() if user.created_at else None,
+        },
+    }
+
+
+@app.get("/api/auth/me")
+def get_me(current_user: User = Depends(get_current_user)):
+    return {
+        "id": current_user.id,
+        "email": current_user.email,
+        "name": current_user.name,
+        "is_admin": current_user.is_admin,
+        "created_at": current_user.created_at.isoformat()
+        if current_user.created_at
+        else None,
+    }
+
+
 @app.post("/api/brands")
 def create_brand(body: BrandCreate, db: Session = Depends(get_db)):
     url = body.url
@@ -116,7 +222,14 @@ def create_brand(body: BrandCreate, db: Session = Depends(get_db)):
         url = "https://" + url
 
     brand_id = str(uuid.uuid4())
-    brand = Brand(id=brand_id, url=url, status="pending", category=body.category)
+    brand = Brand(
+        id=brand_id,
+        url=url,
+        status="pending",
+        progress_step="crawling",
+        category=body.category,
+        name=body.name,
+    )
     db.add(brand)
     db.commit()
     db.refresh(brand)
@@ -280,6 +393,7 @@ def get_brand_status(brand_id: str, db: Session = Depends(get_db)):
     return {
         "id": brand.id,
         "status": brand.status,
+        "progress_step": brand.progress_step if brand.progress_step else "pending",
         "error_message": brand.error_message,
     }
 

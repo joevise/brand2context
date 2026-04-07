@@ -74,6 +74,7 @@ def run_brand_pipeline(brand_id: str, url: str):
         if not brand:
             return
         brand.status = "processing"
+        brand.progress_step = "crawling"
         brand.updated_at = datetime.now(timezone.utc)
         db.commit()
 
@@ -90,6 +91,7 @@ def run_brand_pipeline(brand_id: str, url: str):
             print(f"⚠️ 爬取失败，尝试 Metaso Reader: {url}")
             try:
                 from brand2context.web_searcher import metaso_read_url
+
                 content = metaso_read_url(url)
                 if content and len(content) > 100:
                     pages = [{"url": url, "content": content}]
@@ -115,6 +117,10 @@ def run_brand_pipeline(brand_id: str, url: str):
                 clues["url"] = url
                 print(f"   → 推测品牌名: {brand_name_guess}")
 
+        # Update progress to searching
+        brand.progress_step = "searching"
+        db.commit()
+
         # Step 3: Web search expansion (works even without pages)
         search_results = search_expand(clues)
 
@@ -126,22 +132,41 @@ def run_brand_pipeline(brand_id: str, url: str):
                 try:
                     import requests as req
                     from brand2context.config import TAVILY_API_KEY, TAVILY_ENDPOINT
+
                     if TAVILY_API_KEY:
                         for q in [f"{brand_name} 品牌 官网", f"{brand_name} brand"]:
                             resp = req.post(
                                 TAVILY_ENDPOINT,
-                                json={"query": q, "max_results": 8, "include_answer": True},
-                                headers={"Content-Type": "application/json", "Authorization": f"Bearer {TAVILY_API_KEY}"},
+                                json={
+                                    "query": q,
+                                    "max_results": 8,
+                                    "include_answer": True,
+                                },
+                                headers={
+                                    "Content-Type": "application/json",
+                                    "Authorization": f"Bearer {TAVILY_API_KEY}",
+                                },
                                 timeout=30,
                             )
                             if resp.status_code == 200:
                                 data = resp.json()
-                                search_results.append({
-                                    "query": q,
-                                    "answer": data.get("answer", ""),
-                                    "results": [{"title": r.get("title", ""), "url": r.get("url", ""), "content": r.get("content", "")} for r in data.get("results", [])],
-                                })
-                                print(f"   ✅ 扩展搜索 '{q}' → {len(data.get('results', []))} results")
+                                search_results.append(
+                                    {
+                                        "query": q,
+                                        "answer": data.get("answer", ""),
+                                        "results": [
+                                            {
+                                                "title": r.get("title", ""),
+                                                "url": r.get("url", ""),
+                                                "content": r.get("content", ""),
+                                            }
+                                            for r in data.get("results", [])
+                                        ],
+                                    }
+                                )
+                                print(
+                                    f"   ✅ 扩展搜索 '{q}' → {len(data.get('results', []))} results"
+                                )
                 except Exception as e:
                     print(f"   ⚠️ 扩展搜索失败: {e}")
 
@@ -171,7 +196,10 @@ def run_brand_pipeline(brand_id: str, url: str):
         # Final check: if absolutely nothing, then fail
         if not pages and not search_results:
             brand.status = "error"
-            brand.error_message = "No data collected from URL and search fallback also failed"
+            brand.progress_step = "error"
+            brand.error_message = (
+                "No data collected from URL and search fallback also failed"
+            )
             brand.updated_at = datetime.now(timezone.utc)
             db.commit()
             return
@@ -179,6 +207,10 @@ def run_brand_pipeline(brand_id: str, url: str):
         # Mark if using degraded mode
         if not pages and search_results:
             print(f"📡 降级模式：使用搜索结果生成知识库（无官网爬取数据）")
+
+        # Update progress to structuring
+        brand.progress_step = "structuring"
+        db.commit()
 
         result = structure_brand(url, pages, clues, search_results, social_results)
 
@@ -193,6 +225,7 @@ def run_brand_pipeline(brand_id: str, url: str):
             "identity", {}
         ).get("positioning", "")
         brand.status = "done"
+        brand.progress_step = "done"
         brand.updated_at = datetime.now(timezone.utc)
         brand.last_refreshed = datetime.now(timezone.utc)
         db.commit()
@@ -214,6 +247,7 @@ def run_brand_pipeline(brand_id: str, url: str):
         brand = db.query(Brand).filter(Brand.id == brand_id).first()
         if brand:
             brand.status = "error"
+            brand.progress_step = "error"
             brand.error_message = str(e)[:500]
             brand.updated_at = datetime.now(timezone.utc)
             db.commit()

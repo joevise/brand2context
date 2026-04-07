@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { searchBrands, getCategories, getStatsOverview, createBrand, Brand } from "@/lib/api";
+import { searchBrands, getCategories, getStatsOverview, createBrand, createBrandWithName, Brand } from "@/lib/api";
 import { Search, Plus, X, Loader2, ChevronRight, Database, Zap, Globe } from "lucide-react";
 
 function hashColor(str: string): string {
@@ -46,10 +46,18 @@ function BrandLogo({ brand, size = 64 }: { brand: Brand; size?: number }) {
 }
 
 function AddBrandModal({ open, onClose, onSuccess }: { open: boolean; onClose: () => void; onSuccess: (id: string) => void }) {
+  const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   const [category, setCategory] = useState("");
+  const [categories, setCategories] = useState<{ name: string; count: number }[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (open) {
+      getCategories().then((res) => setCategories(res.categories)).catch(() => {});
+    }
+  }, [open]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,10 +65,12 @@ function AddBrandModal({ open, onClose, onSuccess }: { open: boolean; onClose: (
     setLoading(true);
     setError("");
     try {
-      const brand = await createBrand(url.trim());
+      const brand = await createBrandWithName(url.trim(), name.trim() || undefined, category.trim() || undefined);
       onSuccess(brand.id);
       onClose();
+      setName("");
       setUrl("");
+      setCategory("");
     } catch {
       setError("创建失败，请检查网络连接");
     } finally {
@@ -82,16 +92,29 @@ function AddBrandModal({ open, onClose, onSuccess }: { open: boolean; onClose: (
         </div>
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
+            <label className="block text-sm font-medium mb-2">品牌名称（可选）</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="品牌名称"
+              className="w-full px-4 py-3 rounded-xl border border-[var(--border)] bg-[var(--background)] focus:outline-none focus:ring-2 focus:ring-primary-600"
+            />
+          </div>
+          <div className="mb-4">
             <label className="block text-sm font-medium mb-2">品牌官网 URL</label>
-            <div className="relative">
-              <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--muted-foreground)]" />
-              <input
-                type="text"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                placeholder="https://example.com"
-                className="w-full pl-10 pr-4 py-3 rounded-xl border border-[var(--border)] bg-[var(--background)] focus:outline-none focus:ring-2 focus:ring-primary-600"
-              />
+            <div className="flex items-center gap-2">
+              <span className="text-[var(--muted-foreground)] shrink-0">https://</span>
+              <div className="relative flex-1">
+                <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--muted-foreground)]" />
+                <input
+                  type="text"
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  placeholder="example.com"
+                  className="w-full pl-10 pr-4 py-3 rounded-xl border border-[var(--border)] bg-[var(--background)] focus:outline-none focus:ring-2 focus:ring-primary-600"
+                />
+              </div>
             </div>
           </div>
           <div className="mb-6">
@@ -100,9 +123,15 @@ function AddBrandModal({ open, onClose, onSuccess }: { open: boolean; onClose: (
               type="text"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              placeholder="科技、消费品、汽车..."
+              placeholder="选择或输入品类"
+              list="category-options"
               className="w-full px-4 py-3 rounded-xl border border-[var(--border)] bg-[var(--background)] focus:outline-none focus:ring-2 focus:ring-primary-600"
             />
+            <datalist id="category-options">
+              {categories.map((cat) => (
+                <option key={cat.name} value={cat.name} />
+              ))}
+            </datalist>
           </div>
           {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
           <button

@@ -1,13 +1,40 @@
 "use client";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useTheme } from "./theme-provider";
-import { Sun, Moon, Zap, Search, Plus, ExternalLink, Settings } from "lucide-react";
-import { useState } from "react";
+import { Sun, Moon, Zap, Search, Plus, ExternalLink, Settings, LogOut, User as UserIcon } from "lucide-react";
+import { useState, useEffect } from "react";
+import { getToken, removeToken } from "@/lib/auth";
+import { getMe, AuthUser } from "@/lib/api";
 
 export function Navbar() {
   const { theme, toggle } = useTheme();
+  const router = useRouter();
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+
+  useEffect(() => {
+    const token = getToken();
+    if (token) {
+      getMe().then((u) => {
+        setUser(u);
+        setCheckingAuth(false);
+      }).catch(() => {
+        removeToken();
+        setCheckingAuth(false);
+      });
+    } else {
+      setCheckingAuth(false);
+    }
+  }, []);
+
+  const handleLogout = () => {
+    removeToken();
+    setUser(null);
+    router.refresh();
+  };
 
   return (
     <nav className="sticky top-0 z-50 border-b border-[var(--border)] bg-[var(--background)]/80 backdrop-blur-lg">
@@ -53,6 +80,32 @@ export function Navbar() {
           >
             <Settings className="w-5 h-5" />
           </Link>
+          {!checkingAuth && (
+            <>
+              {user ? (
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 text-sm text-[var(--muted-foreground)]">
+                    <UserIcon className="w-4 h-4" />
+                    <span>{user.name || user.email}</span>
+                  </div>
+                  <button
+                    onClick={handleLogout}
+                    className="p-2 rounded-lg hover:bg-[var(--muted)] transition text-red-500"
+                    title="退出登录"
+                  >
+                    <LogOut className="w-5 h-5" />
+                  </button>
+                </div>
+              ) : (
+                <Link
+                  href="/login"
+                  className="px-4 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium transition"
+                >
+                  登录
+                </Link>
+              )}
+            </>
+          )}
           <button
             onClick={toggle}
             className="p-2 rounded-lg hover:bg-[var(--muted)] transition"

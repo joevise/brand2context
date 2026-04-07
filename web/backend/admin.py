@@ -10,15 +10,40 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+import jwt
+from fastapi import APIRouter, Depends, HTTPException, Header
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
-from models import SessionLocal, Brand, ApiCallLog, get_db, generate_slug
+from models import SessionLocal, Brand, ApiCallLog, User, get_db, generate_slug
 from tasks import run_brand_pipeline
 
+JWT_SECRET = os.getenv("JWT_SECRET", "brand2context-dev-secret")
+
 admin_router = APIRouter(prefix="/api/admin", tags=["admin"])
+
+
+def get_current_admin_user(
+    authorization: str = Header(None), db: Session = Depends(get_db)
+) -> User:
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    token = authorization.replace("Bearer ", "")
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+        user_id = payload.get("user_id")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Invalid token")
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+    if not user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return user
+
 
 SEEDS_FILE = os.path.join(os.path.dirname(__file__), "seeds", "brands_seed.json")
 SETTINGS_FILE = os.path.join(os.path.dirname(__file__), "seeds", "settings.json")
@@ -48,7 +73,7 @@ def _save_settings(s):
 
 
 @admin_router.get("/settings")
-def get_settings():
+def get_settings(current_user: User = Depends(get_current_admin_user)):
     return _load_settings()
 
 
@@ -58,7 +83,9 @@ class SettingsUpdate(BaseModel):
 
 
 @admin_router.put("/settings")
-def update_settings(body: SettingsUpdate):
+def update_settings(
+    body: SettingsUpdate, current_user: User = Depends(get_current_admin_user)
+):
     s = _load_settings()
     if body.refresh_cycle_days is not None:
         s["refresh_cycle_days"] = body.refresh_cycle_days
@@ -88,7 +115,7 @@ def _save_seeds(seeds):
 
 
 @admin_router.get("/seeds")
-def list_seeds(category: Optional[str] = None, db: Session = Depends(get_db)):
+def list_seeds(category: Optional[str] = None, db: Session = Depends(get_db), current_user: User = Depends(get_current_admin_user)):
     seeds = _load_seeds()
     if category:
         seeds = [s for s in seeds if s.get("category") == category]
@@ -133,7 +160,10 @@ def list_seeds(category: Optional[str] = None, db: Session = Depends(get_db)):
     return {
         "seeds": result,
         "total": len(result),
-        "categories": [{"name": k, "count": v} for k, v in sorted(cats.items(), key=lambda x: -x[1])],
+        "categories": [
+            {"name": k, "count": v}
+            for k, v in sorted(cats.items(), key=lambda x: -x[1])
+        ],
     }
 
 
@@ -144,7 +174,7 @@ class SeedCreate(BaseModel):
 
 
 @admin_router.post("/seeds")
-def add_seed(body: SeedCreate):
+def add_seed(body: SeedCreate, current_user: User = Depends(get_current_admin_user)):
     seeds = _load_seeds()
     url = body.url.rstrip("/")
     if any(s.get("url", "").rstrip("/") == url for s in seeds):
@@ -160,10 +190,10 @@ class AIGenerateRequest(BaseModel):
 
 
 @admin_router.post("/seeds/ai-generate")
-def ai_generate_seeds(body: AIGenerateRequest):
+def ai_generate_seeds(body: AIGenerateRequest, current_user: User = Depends(get_current_admin_user)):
     prompt = f"""列出"{body.category}"品类的{body.count}个知名品牌（中国品牌和在中国运营的国际品牌），JSON数组格式。
-每个品牌格式：{{"name":"品牌名","url":"https://官网","category":"{body.category}"}}
-要求：URL 必须是真实可访问的官网。只输出JSON数组，不要其他文字。"""
+    每个品牌格式：{{"name":"品牌名","url":"https://官网","category":"{body.category}"}}
+    要求：URL 必须是真实可访问的官网。只输出json数组，不要其他文字。"""
 
     try:
         resp = httpx.post(
@@ -206,10 +236,10 @@ class SearchAddRequest(BaseModel):
 
 
 @admin_router.post("/seeds/search-add")
-def search_add_seed(body: SearchAddRequest):
+def search_add_seed(body: SearchAddRequest, current_user: User = Depends(get_current_admin_user)):
     prompt = f"""找到"{body.brand_name}"这个品牌的官方网站URL。
-只返回JSON：{{"name":"品牌名","url":"https://官网"}}
-不要其他文字。"""
+    只返回JSON：{{"name":"品牌名","url":"https://官网"}}
+    不要其他文字。"""
 
     try:
         resp = httpx.post(
@@ -293,22 +323,41 @@ class BatchQueue:
 
             # Clean finished threads
             with self._lock:
-                done_ids = [bid for bid, info in self.running.items() if not info["thread"].is_alive()]
+                done_ids = [
+                    bid
+                    for bid, info in self.running.items()
+                    if not info["thread"].is_alive()
+                ]
                 for bid in done_ids:
                     info = self.running.pop(bid)
                     # Check DB for result
                     db = SessionLocal()
                     brand = db.query(Brand).filter(Brand.id == bid).first()
                     if brand and brand.status == "done":
-                        self.completed.append({"name": info["name"], "url": info["url"], "brand_id": bid})
+                        self.completed.append(
+                            {"name": info["name"], "url": info["url"], "brand_id": bid}
+                        )
                     elif brand and brand.status == "error":
-                        self.failed.append({"name": info["name"], "url": info["url"], "brand_id": bid, "error": brand.error_message})
+                        self.failed.append(
+                            {
+                                "name": info["name"],
+                                "url": info["url"],
+                                "brand_id": bid,
+                                "error": brand.error_message,
+                            }
+                        )
                     else:
-                        self.completed.append({"name": info["name"], "url": info["url"], "brand_id": bid})
+                        self.completed.append(
+                            {"name": info["name"], "url": info["url"], "brand_id": bid}
+                        )
                     db.close()
 
             # Start new tasks if capacity available
-            while len(self.running) < self.max_concurrent and not self.q.empty() and not self.paused:
+            while (
+                len(self.running) < self.max_concurrent
+                and not self.q.empty()
+                and not self.paused
+            ):
                 item = self.q.get()
                 url = item.get("url", "")
                 name = item.get("name", "")
@@ -324,7 +373,9 @@ class BatchQueue:
                 db.commit()
                 db.close()
 
-                t = threading.Thread(target=run_brand_pipeline, args=(brand_id, url), daemon=True)
+                t = threading.Thread(
+                    target=run_brand_pipeline, args=(brand_id, url), daemon=True
+                )
                 t.start()
 
                 with self._lock:
@@ -340,7 +391,10 @@ class BatchQueue:
 
     def status(self):
         with self._lock:
-            running_list = [{"name": v["name"], "url": v["url"], "brand_id": k} for k, v in self.running.items()]
+            running_list = [
+                {"name": v["name"], "url": v["url"], "brand_id": k}
+                for k, v in self.running.items()
+            ]
         return {
             "task_id": self.task_id,
             "total": self.total,
@@ -381,7 +435,7 @@ class BatchStartRequest(BaseModel):
 
 
 @admin_router.post("/batch/start")
-def start_batch(body: BatchStartRequest, db: Session = Depends(get_db)):
+def start_batch(body: BatchStartRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_admin_user)):
     seeds = _load_seeds()
     if body.category:
         seeds = [s for s in seeds if s.get("category") == body.category]
@@ -403,7 +457,10 @@ def start_batch(body: BatchStartRequest, db: Session = Depends(get_db)):
         if body.filter == "outdated":
             if not brand or brand.status != "done":
                 continue
-            if brand.last_refreshed and brand.last_refreshed.replace(tzinfo=timezone.utc) >= cutoff:
+            if (
+                brand.last_refreshed
+                and brand.last_refreshed.replace(tzinfo=timezone.utc) >= cutoff
+            ):
                 continue
         # "all" — include everything not currently processing
         if brand and brand.status == "processing":
@@ -419,28 +476,32 @@ def start_batch(body: BatchStartRequest, db: Session = Depends(get_db)):
 
     batch_queue.max_concurrent = settings["max_concurrent"]
     task_id = batch_queue.start(to_crawl)
-    return {"task_id": task_id, "total": len(to_crawl), "message": f"Started {len(to_crawl)} brands"}
+    return {
+        "task_id": task_id,
+        "total": len(to_crawl),
+        "message": f"Started {len(to_crawl)} brands",
+    }
 
 
 @admin_router.get("/batch/status")
-def get_batch_status():
+def get_batch_status(current_user: User = Depends(get_current_admin_user)):
     return batch_queue.status()
 
 
 @admin_router.post("/batch/pause")
-def pause_batch():
+def pause_batch(current_user: User = Depends(get_current_admin_user)):
     batch_queue.pause()
     return {"message": "Paused", "paused": True}
 
 
 @admin_router.post("/batch/resume")
-def resume_batch():
+def resume_batch(current_user: User = Depends(get_current_admin_user)):
     batch_queue.resume()
     return {"message": "Resumed", "paused": False}
 
 
 @admin_router.post("/batch/retry-failed")
-def retry_failed():
+def retry_failed(current_user: User = Depends(get_current_admin_user)):
     count = batch_queue.retry_failed()
     return {"message": f"Retrying {count} failed brands", "count": count}
 
@@ -450,7 +511,7 @@ class RetryDBRequest(BaseModel):
 
 
 @admin_router.post("/batch/retry-db-errors")
-def retry_db_errors(body: RetryDBRequest, db: Session = Depends(get_db)):
+def retry_db_errors(body: RetryDBRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_admin_user)):
     """Retry all brands with status='error' in the database."""
     error_brands = (
         db.query(Brand)
@@ -469,7 +530,14 @@ def retry_db_errors(body: RetryDBRequest, db: Session = Depends(get_db)):
         b.status = "pending"
         b.error_message = None
         b.updated_at = datetime.now(timezone.utc)
-        to_crawl.append({"name": b.name or "", "url": b.url, "category": b.category or "", "brand_id": b.id})
+        to_crawl.append(
+            {
+                "name": b.name or "",
+                "url": b.url,
+                "category": b.category or "",
+                "brand_id": b.id,
+            }
+        )
     db.commit()
 
     # Use existing brand IDs instead of creating new ones
@@ -505,20 +573,39 @@ def _retry_worker():
 
         # Clean finished threads
         with batch_queue._lock:
-            done_ids = [bid for bid, info in batch_queue.running.items() if not info["thread"].is_alive()]
+            done_ids = [
+                bid
+                for bid, info in batch_queue.running.items()
+                if not info["thread"].is_alive()
+            ]
             for bid in done_ids:
                 info = batch_queue.running.pop(bid)
                 db = SessionLocal()
                 brand = db.query(Brand).filter(Brand.id == bid).first()
                 if brand and brand.status == "done":
-                    batch_queue.completed.append({"name": info["name"], "url": info["url"], "brand_id": bid})
+                    batch_queue.completed.append(
+                        {"name": info["name"], "url": info["url"], "brand_id": bid}
+                    )
                 elif brand and brand.status == "error":
-                    batch_queue.failed.append({"name": info["name"], "url": info["url"], "brand_id": bid, "error": brand.error_message})
+                    batch_queue.failed.append(
+                        {
+                            "name": info["name"],
+                            "url": info["url"],
+                            "brand_id": bid,
+                            "error": brand.error_message,
+                        }
+                    )
                 else:
-                    batch_queue.completed.append({"name": info["name"], "url": info["url"], "brand_id": bid})
+                    batch_queue.completed.append(
+                        {"name": info["name"], "url": info["url"], "brand_id": bid}
+                    )
                 db.close()
 
-        while len(batch_queue.running) < batch_queue.max_concurrent and not batch_queue.q.empty() and not batch_queue.paused:
+        while (
+            len(batch_queue.running) < batch_queue.max_concurrent
+            and not batch_queue.q.empty()
+            and not batch_queue.paused
+        ):
             item = batch_queue.q.get()
             url = item.get("url", "")
             name = item.get("name", "")
@@ -531,12 +618,19 @@ def _retry_worker():
             if not brand_id:
                 brand_id = str(uuid.uuid4())
                 db = SessionLocal()
-                brand = Brand(id=brand_id, url=url, status="pending", category=item.get("category", ""))
+                brand = Brand(
+                    id=brand_id,
+                    url=url,
+                    status="pending",
+                    category=item.get("category", ""),
+                )
                 db.add(brand)
                 db.commit()
                 db.close()
 
-            t = threading.Thread(target=run_brand_pipeline, args=(brand_id, url), daemon=True)
+            t = threading.Thread(
+                target=run_brand_pipeline, args=(brand_id, url), daemon=True
+            )
             t.start()
 
             with batch_queue._lock:
@@ -551,12 +645,14 @@ def _retry_worker():
 
 
 @admin_router.get("/refresh-status")
-def get_refresh_status(db: Session = Depends(get_db)):
+def get_refresh_status(db: Session = Depends(get_db), current_user: User = Depends(get_current_admin_user)):
     settings = _load_settings()
     cycle_days = settings["refresh_cycle_days"]
     cutoff = datetime.now(timezone.utc) - timedelta(days=cycle_days)
 
-    done_brands = db.query(Brand).filter(Brand.status == "done", Brand.is_public == True).all()
+    done_brands = (
+        db.query(Brand).filter(Brand.status == "done", Brand.is_public == True).all()
+    )
 
     up_to_date = 0
     outdated = []
@@ -564,14 +660,29 @@ def get_refresh_status(db: Session = Depends(get_db)):
         if b.last_refreshed and b.last_refreshed.replace(tzinfo=timezone.utc) >= cutoff:
             up_to_date += 1
         else:
-            days_since = (datetime.now(timezone.utc) - (b.last_refreshed.replace(tzinfo=timezone.utc) if b.last_refreshed else b.created_at.replace(tzinfo=timezone.utc))).days if (b.last_refreshed or b.created_at) else 999
-            outdated.append({
-                "id": b.id,
-                "name": b.name,
-                "url": b.url,
-                "last_refreshed": b.last_refreshed.isoformat() if b.last_refreshed else None,
-                "days_since": days_since,
-            })
+            days_since = (
+                (
+                    datetime.now(timezone.utc)
+                    - (
+                        b.last_refreshed.replace(tzinfo=timezone.utc)
+                        if b.last_refreshed
+                        else b.created_at.replace(tzinfo=timezone.utc)
+                    )
+                ).days
+                if (b.last_refreshed or b.created_at)
+                else 999
+            )
+            outdated.append(
+                {
+                    "id": b.id,
+                    "name": b.name,
+                    "url": b.url,
+                    "last_refreshed": b.last_refreshed.isoformat()
+                    if b.last_refreshed
+                    else None,
+                    "days_since": days_since,
+                }
+            )
 
     return {
         "total_brands": len(done_brands),
@@ -587,20 +698,29 @@ class RefreshRequest(BaseModel):
 
 
 @admin_router.post("/refresh-outdated")
-def refresh_outdated(body: RefreshRequest, db: Session = Depends(get_db)):
+def refresh_outdated(body: RefreshRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_admin_user)):
     settings = _load_settings()
     cycle_days = settings["refresh_cycle_days"]
     cutoff = datetime.now(timezone.utc) - timedelta(days=cycle_days)
 
-    outdated = db.query(Brand).filter(
-        Brand.status == "done",
-        Brand.is_public == True,
-    ).all()
+    outdated = (
+        db.query(Brand)
+        .filter(
+            Brand.status == "done",
+            Brand.is_public == True,
+        )
+        .all()
+    )
 
     to_refresh = []
     for b in outdated:
-        if not b.last_refreshed or b.last_refreshed.replace(tzinfo=timezone.utc) < cutoff:
-            to_refresh.append({"name": b.name or "", "url": b.url, "category": b.category or ""})
+        if (
+            not b.last_refreshed
+            or b.last_refreshed.replace(tzinfo=timezone.utc) < cutoff
+        ):
+            to_refresh.append(
+                {"name": b.name or "", "url": b.url, "category": b.category or ""}
+            )
         if len(to_refresh) >= body.batch_size:
             break
 
@@ -609,7 +729,11 @@ def refresh_outdated(body: RefreshRequest, db: Session = Depends(get_db)):
 
     batch_queue.max_concurrent = settings["max_concurrent"]
     task_id = batch_queue.start(to_refresh)
-    return {"task_id": task_id, "total": len(to_refresh), "message": f"Refreshing {len(to_refresh)} brands"}
+    return {
+        "task_id": task_id,
+        "total": len(to_refresh),
+        "message": f"Refreshing {len(to_refresh)} brands",
+    }
 
 
 # ============================================================
@@ -618,7 +742,7 @@ def refresh_outdated(body: RefreshRequest, db: Session = Depends(get_db)):
 
 
 @admin_router.get("/dashboard")
-def get_dashboard(db: Session = Depends(get_db)):
+def get_dashboard(db: Session = Depends(get_db), current_user: User = Depends(get_current_admin_user)):
     settings = _load_settings()
     cycle_days = settings["refresh_cycle_days"]
     cutoff = datetime.now(timezone.utc) - timedelta(days=cycle_days)
@@ -636,12 +760,7 @@ def get_dashboard(db: Session = Depends(get_db)):
     for status in ["done", "processing", "error", "pending"]:
         by_status[status] = db.query(Brand).filter(Brand.status == status).count()
 
-    recent = (
-        db.query(Brand)
-        .order_by(Brand.created_at.desc())
-        .limit(10)
-        .all()
-    )
+    recent = db.query(Brand).order_by(Brand.created_at.desc()).limit(10).all()
 
     failed = (
         db.query(Brand)
@@ -653,7 +772,10 @@ def get_dashboard(db: Session = Depends(get_db)):
 
     outdated_count = 0
     for b in db.query(Brand).filter(Brand.status == "done").all():
-        if not b.last_refreshed or b.last_refreshed.replace(tzinfo=timezone.utc) < cutoff:
+        if (
+            not b.last_refreshed
+            or b.last_refreshed.replace(tzinfo=timezone.utc) < cutoff
+        ):
             outdated_count += 1
 
     total_api_calls = db.query(func.sum(ApiCallLog.call_count)).scalar() or 0
@@ -662,14 +784,24 @@ def get_dashboard(db: Session = Depends(get_db)):
 
     return {
         "total_brands": total_brands,
-        "brands_by_category": [{"name": name, "count": count} for name, count in by_category],
+        "brands_by_category": [
+            {"name": name, "count": count} for name, count in by_category
+        ],
         "brands_by_status": by_status,
         "recent_brands": [
-            {"name": b.name, "created_at": b.created_at.isoformat() if b.created_at else None, "status": b.status}
+            {
+                "name": b.name,
+                "created_at": b.created_at.isoformat() if b.created_at else None,
+                "status": b.status,
+            }
             for b in recent
         ],
         "failed_brands": [
-            {"name": b.name, "error_message": b.error_message, "created_at": b.created_at.isoformat() if b.created_at else None}
+            {
+                "name": b.name,
+                "error_message": b.error_message,
+                "created_at": b.created_at.isoformat() if b.created_at else None,
+            }
             for b in failed
         ],
         "outdated_count": outdated_count,

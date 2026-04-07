@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
+import Link from "next/link";
 import {
   getAdminDashboard,
   getAdminSeeds,
@@ -19,6 +20,8 @@ import {
   Seed,
   BatchStatus,
   AdminSettings,
+  getMe,
+  AuthUser,
 } from "@/lib/api";
 import {
   LayoutDashboard,
@@ -39,6 +42,7 @@ import {
   Sparkles,
   Settings,
   BarChart3,
+  Shield,
 } from "lucide-react";
 
 const STATUS_COLORS = {
@@ -299,6 +303,8 @@ export default function AdminPage() {
   const [batchFilter, setBatchFilter] = useState<"new" | "outdated" | "all">("all");
   const [batchSize, setBatchSize] = useState(10);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
 
   const fetchDashboard = useCallback(async () => {
     try {
@@ -341,12 +347,26 @@ export default function AdminPage() {
   }, []);
 
   useEffect(() => {
-    const init = async () => {
-      setLoading(true);
-      await Promise.all([fetchDashboard(), fetchSeeds(), fetchSettings()]);
-      setLoading(false);
+    const checkAuth = async () => {
+      try {
+        const u = await getMe();
+        setUser(u);
+        if (!u.is_admin) {
+          setAuthChecked(true);
+          setLoading(false);
+          return;
+        }
+        setAuthChecked(true);
+        setLoading(true);
+        await Promise.all([fetchDashboard(), fetchSeeds(), fetchSettings()]);
+        setLoading(false);
+      } catch {
+        setUser(null);
+        setAuthChecked(true);
+        setLoading(false);
+      }
     };
-    init();
+    checkAuth();
   }, [fetchDashboard, fetchSeeds, fetchSettings]);
 
   useEffect(() => {
@@ -369,10 +389,10 @@ export default function AdminPage() {
   }, [activeTab, fetchRefreshStatus]);
 
   useEffect(() => {
-    if (!loading) {
+    if (!loading && authChecked) {
       fetchSeeds();
     }
-  }, [selectedCategory, loading, fetchSeeds]);
+  }, [selectedCategory, loading, authChecked, fetchSeeds]);
 
   const handleStartBatch = async () => {
     try {
@@ -420,6 +440,50 @@ export default function AdminPage() {
       await updateAdminSettings(settings);
     } catch {}
   };
+
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-950 to-gray-900 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
+      </div>
+    );
+  }
+
+  if (authChecked && !user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-950 to-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <Shield className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-white mb-2">请先登录</h2>
+          <p className="text-gray-400 mb-6">需要登录后才能访问管理后台</p>
+          <Link
+            href="/login"
+            className="px-6 py-3 rounded-xl bg-primary-600 hover:bg-primary-700 text-white font-semibold transition inline-flex items-center gap-2"
+          >
+            前往登录
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (authChecked && user && !user.is_admin) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-950 to-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <Shield className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-white mb-2">无管理员权限</h2>
+          <p className="text-gray-400 mb-6">您的账号没有访问管理后台的权限</p>
+          <Link
+            href="/"
+            className="px-6 py-3 rounded-xl bg-primary-600 hover:bg-primary-700 text-white font-semibold transition inline-flex items-center gap-2"
+          >
+            返回首页
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

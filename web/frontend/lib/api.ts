@@ -1,5 +1,7 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+import { getAuthHeaders } from "./auth";
+
 export interface Brand {
   id: string;
   name: string | null;
@@ -14,6 +16,20 @@ export interface Brand {
   slug?: string;
   description?: string;
   is_public?: boolean;
+  progress_step?: string;
+}
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  name: string | null;
+  is_admin: boolean;
+  created_at: string;
+}
+
+export interface AuthResponse {
+  token: string;
+  user: AuthUser;
 }
 
 export async function createBrand(url: string): Promise<Brand> {
@@ -188,7 +204,10 @@ export interface AdminSettings {
 }
 
 export async function getAdminDashboard(): Promise<AdminDashboard> {
-  const res = await fetch(`${API_URL}/api/admin/dashboard`, { cache: "no-store" });
+  const res = await fetch(`${API_URL}/api/admin/dashboard`, {
+    cache: "no-store",
+    headers: { ...getAuthHeaders() },
+  });
   if (!res.ok) throw new Error("Failed to fetch admin dashboard");
   return res.json();
 }
@@ -196,7 +215,10 @@ export async function getAdminDashboard(): Promise<AdminDashboard> {
 export async function getAdminSeeds(category?: string): Promise<SeedsResponse> {
   const params = new URLSearchParams();
   if (category) params.set("category", category);
-  const res = await fetch(`${API_URL}/api/admin/seeds?${params}`, { cache: "no-store" });
+  const res = await fetch(`${API_URL}/api/admin/seeds?${params}`, {
+    cache: "no-store",
+    headers: { ...getAuthHeaders() },
+  });
   if (!res.ok) throw new Error("Failed to fetch seeds");
   return res.json();
 }
@@ -204,7 +226,7 @@ export async function getAdminSeeds(category?: string): Promise<SeedsResponse> {
 export async function createSeed(data: { name: string; url: string; category: string }): Promise<{ message: string; added: boolean; total: number }> {
   const res = await fetch(`${API_URL}/api/admin/seeds`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error("Failed to create seed");
@@ -214,7 +236,7 @@ export async function createSeed(data: { name: string; url: string; category: st
 export async function aiGenerateSeeds(data: { category: string; count: number }): Promise<{ added: number; brands: Seed[]; total_seeds: number }> {
   const res = await fetch(`${API_URL}/api/admin/seeds/ai-generate`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error("Failed to generate seeds");
@@ -224,7 +246,7 @@ export async function aiGenerateSeeds(data: { category: string; count: number })
 export async function searchAddSeed(data: { brand_name: string; category?: string }): Promise<{ message: string; added: boolean; brand: { name: string; url: string } }> {
   const res = await fetch(`${API_URL}/api/admin/seeds/search-add`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error("Failed to search and add seed");
@@ -234,7 +256,7 @@ export async function searchAddSeed(data: { brand_name: string; category?: strin
 export async function startBatch(data: { category?: string; batch_size: number; filter: string }): Promise<{ task_id: string | null; total: number; message: string }> {
   const res = await fetch(`${API_URL}/api/admin/batch/start`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error("Failed to start batch");
@@ -242,28 +264,43 @@ export async function startBatch(data: { category?: string; batch_size: number; 
 }
 
 export async function getBatchStatus(): Promise<BatchStatus> {
-  const res = await fetch(`${API_URL}/api/admin/batch/status`, { cache: "no-store" });
+  const res = await fetch(`${API_URL}/api/admin/batch/status`, {
+    cache: "no-store",
+    headers: { ...getAuthHeaders() },
+  });
   if (!res.ok) throw new Error("Failed to get batch status");
   return res.json();
 }
 
 export async function pauseBatch(): Promise<void> {
-  const res = await fetch(`${API_URL}/api/admin/batch/pause`, { method: "POST" });
+  const res = await fetch(`${API_URL}/api/admin/batch/pause`, {
+    method: "POST",
+    headers: { ...getAuthHeaders() },
+  });
   if (!res.ok) throw new Error("Failed to pause batch");
 }
 
 export async function resumeBatch(): Promise<void> {
-  const res = await fetch(`${API_URL}/api/admin/batch/resume`, { method: "POST" });
+  const res = await fetch(`${API_URL}/api/admin/batch/resume`, {
+    method: "POST",
+    headers: { ...getAuthHeaders() },
+  });
   if (!res.ok) throw new Error("Failed to resume batch");
 }
 
 export async function retryFailedBatch(): Promise<void> {
-  const res = await fetch(`${API_URL}/api/admin/batch/retry-failed`, { method: "POST" });
+  const res = await fetch(`${API_URL}/api/admin/batch/retry-failed`, {
+    method: "POST",
+    headers: { ...getAuthHeaders() },
+  });
   if (!res.ok) throw new Error("Failed to retry failed");
 }
 
 export async function getRefreshStatus(): Promise<{ total_brands: number; up_to_date: number; outdated: number; outdated_brands: { id: string; name: string; url: string; last_refreshed: string | null; days_since: number }[]; refresh_cycle_days: number }> {
-  const res = await fetch(`${API_URL}/api/admin/refresh-status`, { cache: "no-store" });
+  const res = await fetch(`${API_URL}/api/admin/refresh-status`, {
+    cache: "no-store",
+    headers: { ...getAuthHeaders() },
+  });
   if (!res.ok) throw new Error("Failed to get refresh status");
   return res.json();
 }
@@ -271,7 +308,7 @@ export async function getRefreshStatus(): Promise<{ total_brands: number; up_to_
 export async function refreshOutdated(data: { batch_size: number }): Promise<{ task_id: string; total: number; message: string }> {
   const res = await fetch(`${API_URL}/api/admin/refresh-outdated`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error("Failed to refresh outdated");
@@ -279,7 +316,10 @@ export async function refreshOutdated(data: { batch_size: number }): Promise<{ t
 }
 
 export async function getAdminSettings(): Promise<AdminSettings> {
-  const res = await fetch(`${API_URL}/api/admin/settings`, { cache: "no-store" });
+  const res = await fetch(`${API_URL}/api/admin/settings`, {
+    cache: "no-store",
+    headers: { ...getAuthHeaders() },
+  });
   if (!res.ok) throw new Error("Failed to get settings");
   return res.json();
 }
@@ -287,7 +327,7 @@ export async function getAdminSettings(): Promise<AdminSettings> {
 export async function updateAdminSettings(data: AdminSettings): Promise<AdminSettings> {
   const res = await fetch(`${API_URL}/api/admin/settings`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error("Failed to update settings");
@@ -297,9 +337,53 @@ export async function updateAdminSettings(data: AdminSettings): Promise<AdminSet
 export async function retryDBErrors(batchSize: number = 10): Promise<{ message: string; count: number }> {
   const res = await fetch(`${API_URL}/api/admin/batch/retry-db-errors`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
     body: JSON.stringify({ batch_size: batchSize }),
   });
   if (!res.ok) throw new Error("Failed to retry DB errors");
+  return res.json();
+}
+
+export async function register(email: string, password: string, name: string): Promise<AuthResponse> {
+  const res = await fetch(`${API_URL}/api/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password, name }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || "Registration failed");
+  }
+  return res.json();
+}
+
+export async function login(email: string, password: string): Promise<AuthResponse> {
+  const res = await fetch(`${API_URL}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || "Login failed");
+  }
+  return res.json();
+}
+
+export async function getMe(): Promise<AuthUser> {
+  const res = await fetch(`${API_URL}/api/auth/me`, {
+    headers: { ...getAuthHeaders() },
+  });
+  if (!res.ok) throw new Error("Failed to get user info");
+  return res.json();
+}
+
+export async function createBrandWithName(url: string, name?: string, category?: string): Promise<Brand> {
+  const res = await fetch(`${API_URL}/api/brands`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url, name, category }),
+  });
+  if (!res.ok) throw new Error("Failed to create brand");
   return res.json();
 }

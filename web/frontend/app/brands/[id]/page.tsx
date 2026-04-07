@@ -6,11 +6,207 @@ import {
   Building2, Package, Sparkles, Shield, MessageCircle, MapPin,
   Newspaper, Eye, BarChart3, Activity, Loader2, ArrowLeft, ExternalLink,
   Star, Award, Users, Globe, Mail, Phone, Pencil, Save, XCircle, Check,
-  Search, Plus, Trash2, X, Calendar
+  Search, Plus, Trash2, X, Calendar, Share, Edit, CheckCircle2, Link2
 } from "lucide-react";
 import Link from "next/link";
 import { ChatPanel } from "@/components/chat-panel";
 import { IntegrationPanel } from "@/components/integration-panel";
+
+function hashColor(str: string): string {
+  const colors = [
+    "bg-red-500", "bg-orange-500", "bg-amber-500", "bg-yellow-500",
+    "bg-lime-500", "bg-green-500", "bg-emerald-500", "bg-teal-500",
+    "bg-cyan-500", "bg-sky-500", "bg-blue-500", "bg-indigo-500",
+    "bg-violet-500", "bg-purple-500", "bg-fuchsia-500", "bg-pink-500",
+  ];
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return colors[Math.abs(hash) % colors.length];
+}
+
+function BrandLogo({ brand, size = 64 }: { brand: Brand; size?: number }) {
+  if (brand.logo_url) {
+    return (
+      <img
+        src={brand.logo_url}
+        alt={brand.name || ""}
+        className="rounded-lg object-contain"
+        style={{ width: size, height: size }}
+        onError={(e) => {
+          (e.target as HTMLImageElement).style.display = "none";
+          (e.target as HTMLImageElement).nextElementSibling?.classList.remove("hidden");
+        }}
+      />
+    );
+  }
+  const initial = (brand.name?.charAt(0) || brand.url.charAt(0)).toUpperCase();
+  return (
+    <div
+      className={`${hashColor(brand.name || brand.url)} rounded-lg flex items-center justify-center text-white font-bold`}
+      style={{ width: size, height: size, fontSize: size * 0.4 }}
+    >
+      {initial}
+    </div>
+  );
+}
+
+const DIMENSION_TABS = [
+  { key: "identity", label: "品牌身份", icon: Building2 },
+  { key: "offerings", label: "产品服务", icon: Package },
+  { key: "differentiation", label: "差异化", icon: Sparkles },
+  { key: "trust", label: "信任背书", icon: Shield },
+  { key: "experience", label: "用户体验", icon: MessageCircle },
+  { key: "access", label: "获取方式", icon: MapPin },
+  { key: "content", label: "内容资产", icon: Newspaper },
+  { key: "perception", label: "品牌感知", icon: Eye },
+  { key: "decision_factors", label: "决策因子", icon: BarChart3 },
+  { key: "vitality", label: "品牌活力", icon: Activity },
+  { key: "campaigns", label: "品牌活动", icon: Calendar },
+  { key: "integration", label: "接入指南", icon: Link2 },
+];
+
+const PROGRESS_STEPS = [
+  { key: "crawling", label: "抓取网页" },
+  { key: "searching", label: "全网搜索" },
+  { key: "structuring", label: "AI分析" },
+  { key: "done", label: "完成" },
+];
+
+function ProgressSteps({ currentStep }: { currentStep?: string }) {
+  const currentIndex = PROGRESS_STEPS.findIndex(s => s.key === currentStep);
+  
+  return (
+    <div className="flex items-center justify-center gap-2 mb-6">
+      {PROGRESS_STEPS.map((step, index) => {
+        const isCompleted = index < currentIndex;
+        const isCurrent = index === currentIndex;
+        const isPending = index > currentIndex;
+        
+        return (
+          <div key={step.key} className="flex items-center">
+            <div className="flex flex-col items-center">
+              <div
+                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+                  isCompleted
+                    ? "bg-green-500 text-white"
+                    : isCurrent
+                    ? "bg-primary-600 text-white animate-pulse"
+                    : "bg-gray-200 dark:bg-gray-700 text-gray-400"
+                }`}
+              >
+                {isCompleted ? (
+                  <CheckCircle2 className="w-5 h-5" />
+                ) : (
+                  <span className="text-sm font-medium">{index + 1}</span>
+                )}
+              </div>
+              <span
+                className={`text-xs mt-2 ${
+                  isCurrent ? "text-primary-600 font-medium" : "text-gray-500"
+                }`}
+              >
+                {step.label}
+              </span>
+            </div>
+            {index < PROGRESS_STEPS.length - 1 && (
+              <div
+                className={`w-12 h-0.5 mx-1 ${
+                  index < currentIndex
+                    ? "bg-green-500"
+                    : "bg-gray-200 dark:bg-gray-700"
+                }`}
+              />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function BrandSummaryCard({ brand, editMode, onEditToggle }: { brand: Brand; editMode: boolean; onEditToggle: () => void }) {
+  const d = brand.data?.identity || {};
+  const [copied, setCopied] = useState(false);
+
+  const handleShare = async () => {
+    const url = `${window.location.origin}/kb/${brand.id}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {}
+  };
+
+  const statusColors = {
+    done: "bg-green-500/20 text-green-400 border-green-500/30",
+    processing: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+    error: "bg-red-500/20 text-red-400 border-red-500/30",
+    pending: "bg-gray-500/20 text-gray-400 border-gray-500/30",
+  };
+
+  return (
+    <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 mb-6">
+      <div className="flex items-start gap-6">
+        <div className="shrink-0">
+          <BrandLogo brand={brand} size={96} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold mb-1">{brand.name || d.name || "Unnamed Brand"}</h1>
+              {(d.tagline || brand.description) && (
+                <p className="text-lg text-primary-600 italic mb-3">&ldquo;{d.tagline || brand.description}&rdquo;</p>
+              )}
+            </div>
+          </div>
+          {(d.positioning || brand.category || brand.status) && (
+            <div className="flex flex-wrap items-center gap-2 mb-4">
+              {d.positioning && (
+                <span className="text-sm text-[var(--muted-foreground)] line-clamp-1">{d.positioning}</span>
+              )}
+              {brand.category && (
+                <span className="px-2 py-0.5 rounded-full bg-[var(--muted)] text-xs">{brand.category}</span>
+              )}
+              {brand.status && (
+                <span className={`px-2 py-0.5 rounded-full text-xs border ${statusColors[brand.status]}`}>
+                  {brand.status === "done" ? "已完成" : brand.status === "processing" ? "处理中" : brand.status === "error" ? "错误" : "等待中"}
+                </span>
+              )}
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onEditToggle}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition ${
+                editMode
+                  ? "bg-primary-600 text-white"
+                  : "bg-[var(--muted)] hover:bg-primary-100 dark:hover:bg-primary-900/30"
+              }`}
+            >
+              {editMode ? <><Check className="w-3.5 h-3.5" /> 编辑中</> : <><Pencil className="w-3.5 h-3.5" /> 编辑</>}
+            </button>
+            <Link
+              href={`/kb/${brand.id}`}
+              target="_blank"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm bg-[var(--muted)] hover:bg-primary-100 dark:hover:bg-primary-900/30 transition"
+            >
+              <Globe className="w-3.5 h-3.5" /> 公开页
+            </Link>
+            <button
+              onClick={handleShare}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm bg-[var(--muted)] hover:bg-primary-100 dark:hover:bg-primary-900/30 transition"
+            >
+              {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Share className="w-3.5 h-3.5" />}
+              {copied ? "已复制" : "分享"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function Section({ title, icon: Icon, children, editMode, onEdit }: any) {
   return (
@@ -169,7 +365,7 @@ function EditableField({ editMode, onClick, children }: { editMode: boolean; onC
 }
 
 // Knowledge Base Search Bar
-function KBSearchBar({ brandId }: { brandId: string }) {
+function KBSearchBar({ brandId, onDimensionClick }: { brandId: string; onDimensionClick?: (dimension: string) => void }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<{ documents: string[]; metadatas: any[] } | null>(null);
   const [searching, setSearching] = useState(false);
@@ -195,17 +391,11 @@ function KBSearchBar({ brandId }: { brandId: string }) {
     }
   };
 
-  const scrollToSection = (dimension: string) => {
-    const label = DIMENSION_LABELS[dimension];
-    if (!label) return;
-    const headings = Array.from(document.querySelectorAll("h2"));
-    for (let i = 0; i < headings.length; i++) {
-      if (headings[i].textContent?.includes(label)) {
-        headings[i].scrollIntoView({ behavior: "smooth", block: "start" });
-        setOpen(false);
-        break;
-      }
+  const handleResultClick = (dimension: string) => {
+    if (onDimensionClick) {
+      onDimensionClick(dimension);
     }
+    setOpen(false);
   };
 
   return (
@@ -237,7 +427,7 @@ function KBSearchBar({ brandId }: { brandId: string }) {
             // Strip the [brand] [dim] prefix for display
             const text = doc.replace(/^\[.*?\]\s*\[.*?\]\s*/, "").slice(0, 200);
             return (
-              <button key={i} onClick={() => scrollToSection(dim)} className="w-full text-left px-4 py-3 border-b border-[var(--border)] last:border-0 hover:bg-[var(--muted)] transition">
+              <button key={i} onClick={() => handleResultClick(dim)} className="w-full text-left px-4 py-3 border-b border-[var(--border)] last:border-0 hover:bg-[var(--muted)] transition">
                 <span className="inline-block px-2 py-0.5 rounded-full text-xs bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 mb-1">{DIMENSION_LABELS[dim] || dim}</span>
                 <p className="text-sm text-[var(--muted-foreground)] line-clamp-2">{text}...</p>
               </button>
@@ -757,6 +947,7 @@ export default function BrandDetailPage() {
   const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState("identity");
 
   useEffect(() => {
     let interval: any;
@@ -798,6 +989,10 @@ export default function BrandDetailPage() {
     }
   };
 
+  const handleDimensionClick = (dimension: string) => {
+    setActiveTab(dimension);
+  };
+
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-primary-600" /></div>;
   if (!brand) return <div className="text-center py-20">品牌未找到</div>;
 
@@ -810,37 +1005,17 @@ export default function BrandDetailPage() {
         <Link href="/brands" className="inline-flex items-center gap-1 text-sm text-[var(--muted-foreground)] hover:text-primary-600">
           <ArrowLeft className="w-4 h-4" /> 返回列表
         </Link>
-        <div className="flex items-center gap-3">
-          {d && (
-            <>
-              <Link
-                href={`/kb/${id}`}
-                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm bg-[var(--muted)] hover:bg-primary-100 dark:hover:bg-primary-900/30 transition"
-              >
-                <Globe className="w-3.5 h-3.5" /> 公开页面
-              </Link>
-              <button
-                onClick={() => setEditMode(!editMode)}
-                className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm transition ${
-                  editMode
-                    ? "bg-primary-600 text-white"
-                    : "bg-[var(--muted)] hover:bg-primary-100 dark:hover:bg-primary-900/30"
-                }`}
-              >
-                {editMode ? <><Check className="w-3.5 h-3.5" /> 编辑中</> : <><Pencil className="w-3.5 h-3.5" /> 编辑</>}
-              </button>
-            </>
-          )}
-          {saving && <Loader2 className="w-4 h-4 animate-spin text-primary-600" />}
-        </div>
+        {saving && <Loader2 className="w-4 h-4 animate-spin text-primary-600" />}
       </div>
+
+      <BrandSummaryCard brand={brand} editMode={editMode} onEditToggle={() => setEditMode(!editMode)} />
 
       {isGenerating && (
         <div className="mb-8 p-8 rounded-2xl border border-primary-200 dark:border-primary-800 bg-primary-50 dark:bg-primary-950/20 text-center">
-          <Loader2 className="w-10 h-10 animate-spin text-primary-600 mx-auto mb-4" />
           <h2 className="text-xl font-semibold mb-2">正在生成品牌知识库</h2>
-          <p className="text-[var(--muted-foreground)]">正在爬取 {brand.url} 并结构化数据...</p>
-          <p className="text-xs text-[var(--muted-foreground)] mt-2">通常需要 1-3 分钟</p>
+          <p className="text-[var(--muted-foreground)] mb-6">正在爬取 {brand.url} 并结构化数据...</p>
+          <ProgressSteps currentStep={brand.progress_step} />
+          <p className="text-xs text-[var(--muted-foreground)] mt-4">通常需要 1-3 分钟</p>
         </div>
       )}
 
@@ -852,25 +1027,45 @@ export default function BrandDetailPage() {
       )}
 
       {d && (
-        <div className="space-y-6">
-          <KBSearchBar brandId={id} />
-          <IdentityCard data={d.identity} editMode={editMode} onUpdate={handleUpdate} />
-          <OfferingsGrid data={d.offerings} editMode={editMode} onUpdate={handleUpdate} />
-          <DifferentiationSection data={d.differentiation} editMode={editMode} onUpdate={handleUpdate} />
-          <TrustSection data={d.trust} editMode={editMode} onUpdate={handleUpdate} />
-          <ExperienceSection data={d.experience} editMode={editMode} onUpdate={handleUpdate} />
-          <AccessSection data={d.access} editMode={editMode} onUpdate={handleUpdate} />
-          <ContentSection data={d.content} editMode={editMode} onUpdate={handleUpdate} />
-          <PerceptionSection data={d.perception} editMode={editMode} onUpdate={handleUpdate} />
-          <DecisionSection data={d.decision_factors} editMode={editMode} onUpdate={handleUpdate} />
-          <VitalitySection data={d.vitality} editMode={editMode} onUpdate={handleUpdate} />
-          <CampaignsSection data={d.campaigns} editMode={editMode} onUpdate={handleUpdate} />
-          <IntegrationPanel brandId={id} />
-        </div>
-      )}
+        <>
+          <div className="mb-6 overflow-x-auto">
+            <div className="flex gap-1 border-b border-[var(--border)] min-w-max">
+              {DIMENSION_TABS.map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  className={`px-4 py-3 text-sm font-medium whitespace-nowrap transition border-b-2 ${
+                    activeTab === tab.key
+                      ? "text-primary-600 border-primary-600"
+                      : "text-[var(--muted-foreground)] border-transparent hover:text-primary-600 hover:border-primary-300"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
-      {/* Chat panel */}
-      {d && <ChatPanel brandId={id} />}
+          <KBSearchBar brandId={id} onDimensionClick={handleDimensionClick} />
+
+          <div className="space-y-6">
+            {activeTab === "identity" && <IdentityCard data={d.identity} editMode={editMode} onUpdate={handleUpdate} />}
+            {activeTab === "offerings" && <OfferingsGrid data={d.offerings} editMode={editMode} onUpdate={handleUpdate} />}
+            {activeTab === "differentiation" && <DifferentiationSection data={d.differentiation} editMode={editMode} onUpdate={handleUpdate} />}
+            {activeTab === "trust" && <TrustSection data={d.trust} editMode={editMode} onUpdate={handleUpdate} />}
+            {activeTab === "experience" && <ExperienceSection data={d.experience} editMode={editMode} onUpdate={handleUpdate} />}
+            {activeTab === "access" && <AccessSection data={d.access} editMode={editMode} onUpdate={handleUpdate} />}
+            {activeTab === "content" && <ContentSection data={d.content} editMode={editMode} onUpdate={handleUpdate} />}
+            {activeTab === "perception" && <PerceptionSection data={d.perception} editMode={editMode} onUpdate={handleUpdate} />}
+            {activeTab === "decision_factors" && <DecisionSection data={d.decision_factors} editMode={editMode} onUpdate={handleUpdate} />}
+            {activeTab === "vitality" && <VitalitySection data={d.vitality} editMode={editMode} onUpdate={handleUpdate} />}
+            {activeTab === "campaigns" && <CampaignsSection data={d.campaigns} editMode={editMode} onUpdate={handleUpdate} />}
+            {activeTab === "integration" && <IntegrationPanel brandId={id} />}
+          </div>
+
+          <ChatPanel brandId={id} />
+        </>
+      )}
     </div>
   );
 }
