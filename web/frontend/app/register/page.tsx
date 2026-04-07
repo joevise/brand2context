@@ -47,7 +47,7 @@ export default function RegisterPage() {
     try {
       const data = await register(email, password, name);
       setToken(data.token);
-      router.push("/");
+      window.location.href = "/";
     } catch (err: any) {
       setError(err.message || "Registration failed");
     } finally {

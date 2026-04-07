@@ -39,7 +39,7 @@ export default function LoginPage() {
     try {
       const data = await login(email, password);
       setToken(data.token);
-      router.push("/");
+      window.location.href = "/";
     } catch (err: any) {
       setError(err.message || "Login failed");
     } finally {
