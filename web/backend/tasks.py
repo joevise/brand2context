@@ -78,53 +78,90 @@ def run_brand_pipeline(brand_id: str, url: str):
         brand.updated_at = datetime.now(timezone.utc)
         db.commit()
 
-        from brand2context.crawler import crawl_site
+        from brand2context.crawler import crawl_site, crawl_site_incremental
         from brand2context.clue_extractor import extract_clues
         from brand2context.web_searcher import search_expand
-        from brand2context.structurer import structure_brand
+        from brand2context.structurer import (
+            structure_brand,
+            structure_brand_incremental,
+        )
 
-        # Step 1: Try crawling the website
-        pages = crawl_site(url)
+        output_path = os.path.join(DATA_DIR, f"{brand_id}.json")
+        hashes_path = os.path.join(DATA_DIR, f"{brand_id}_hashes.json")
 
-        # Step 1.5: If crawl failed, try Metaso Reader as fallback
-        if not pages:
-            print(f"⚠️ 爬取失败，尝试 Metaso Reader: {url}")
+        previous_result = None
+        previous_hashes = None
+        is_incremental = False
+
+        if os.path.exists(output_path):
             try:
-                from brand2context.web_searcher import metaso_read_url
+                with open(output_path, "r", encoding="utf-8") as f:
+                    previous_result = json.load(f)
+                if previous_result and brand.status == "done":
+                    is_incremental = True
+            except Exception:
+                pass
 
-                content = metaso_read_url(url)
-                if content and len(content) > 100:
-                    pages = [{"url": url, "content": content}]
-                    print(f"   ✅ Metaso Reader 成功，获取 {len(content)} 字符")
-                else:
-                    print(f"   ⚠️ Metaso Reader 内容太少，跳过")
-            except Exception as e:
-                print(f"   ⚠️ Metaso Reader 失败: {e}")
+        if is_incremental and os.path.exists(hashes_path):
+            try:
+                with open(hashes_path, "r", encoding="utf-8") as f:
+                    hashes_data = json.load(f)
+                    previous_hashes = hashes_data.get("hashes", {})
+            except Exception:
+                previous_hashes = None
+
+        if is_incremental and previous_hashes is not None:
+            print(f"🔄 增量更新模式: 检测到已有知识库")
+            changed_pages, current_hashes, changed_urls = crawl_site_incremental(
+                url, previous_hashes
+            )
+
+            if not changed_pages:
+                print(f"📡 无页面变化，跳过爬取和 LLM 调用")
+                brand.last_refreshed = datetime.now(timezone.utc)
+                brand.updated_at = datetime.now(timezone.utc)
+                db.commit()
+                return
+
+            pages = changed_pages
+            all_pages_for_context = pages
+        else:
+            if is_incremental:
+                print(f"⚠️ 增量模式但无 hash 文件，将进行全量抓取")
+            pages = crawl_site(url)
+
+            if not pages:
+                print(f"⚠️ 爬取失败，尝试 Metaso Reader: {url}")
+                try:
+                    from brand2context.web_searcher import metaso_read_url
+
+                    content = metaso_read_url(url)
+                    if content and len(content) > 100:
+                        pages = [{"url": url, "content": content}]
+                        print(f"   ✅ Metaso Reader 成功，获取 {len(content)} 字符")
+                    else:
+                        print(f"   ⚠️ Metaso Reader 内容太少，跳过")
+                except Exception as e:
+                    print(f"   ⚠️ Metaso Reader 失败: {e}")
 
         clues = extract_clues(pages, url)
 
-        # Step 2: If crawl failed, infer brand name from URL/DB for search fallback
         if not pages:
             print(f"⚠️ 爬取失败，启用搜索降级模式: {url}")
             if not clues.get("brand_name"):
-                # Try to get brand name from DB (admin may have set it)
                 brand_name_guess = brand.name
                 if not brand_name_guess:
-                    # Infer from domain: www.tesla.com -> tesla
                     domain = urlparse(url).netloc.replace("www.", "").split(".")[0]
                     brand_name_guess = domain.capitalize()
                 clues["brand_name"] = brand_name_guess
                 clues["url"] = url
                 print(f"   → 推测品牌名: {brand_name_guess}")
 
-        # Update progress to searching
         brand.progress_step = "searching"
         db.commit()
 
-        # Step 3: Web search expansion (works even without pages)
         search_results = search_expand(clues, pages=pages)
 
-        # Step 3.5: If both crawl and search failed, try one more time with broader search
         if not pages and not search_results:
             print(f"⚠️ 常规搜索也失败，尝试扩展搜索...")
             brand_name = clues.get("brand_name", "")
@@ -170,7 +207,6 @@ def run_brand_pipeline(brand_id: str, url: str):
                 except Exception as e:
                     print(f"   ⚠️ 扩展搜索失败: {e}")
 
-        # Step 3.6: Social media crawl
         social_results = []
         brand_name_for_social = clues.get("brand_name", "")
         if brand_name_for_social:
@@ -193,7 +229,6 @@ def run_brand_pipeline(brand_id: str, url: str):
             except Exception as e:
                 print(f"⚠️ 社交媒体抓取跳过: {e}")
 
-        # Final check: if absolutely nothing, then fail
         if not pages and not search_results:
             brand.status = "error"
             brand.progress_step = "error"
@@ -204,19 +239,36 @@ def run_brand_pipeline(brand_id: str, url: str):
             db.commit()
             return
 
-        # Mark if using degraded mode
         if not pages and search_results:
             print(f"📡 降级模式：使用搜索结果生成知识库（无官网爬取数据）")
 
-        # Update progress to structuring
         brand.progress_step = "structuring"
         db.commit()
 
-        result = structure_brand(url, pages, clues, search_results, social_results)
+        if is_incremental and previous_result and changed_pages:
+            result = structure_brand_incremental(
+                url,
+                changed_pages,
+                all_pages_for_context,
+                clues,
+                search_results,
+                social_results,
+                previous_result,
+                changed_urls,
+            )
+        else:
+            result = structure_brand(url, pages, clues, search_results, social_results)
 
-        output_path = os.path.join(DATA_DIR, f"{brand_id}.json")
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump(result, f, ensure_ascii=False, indent=2)
+
+        if is_incremental and "current_hashes" in dir():
+            hashes_data = {
+                "hashes": current_hashes,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+            with open(hashes_path, "w", encoding="utf-8") as f:
+                json.dump(hashes_data, f, ensure_ascii=False, indent=2)
 
         brand_name = result.get("identity", {}).get("name", "Unknown Brand")
         brand.name = brand_name

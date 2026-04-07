@@ -372,3 +372,165 @@ Fill in as much as possible. Output ONLY valid JSON."""
         except Exception as e2:
             print(f"   ❌ Fallback also failed: {e2}")
             raise e
+
+
+def _detect_affected_dimensions(changed_urls: list[str]) -> list[str]:
+    """Detect which dimensions may be affected by changed URLs.
+
+    Args:
+        changed_urls: List of URLs that changed
+
+    Returns:
+        List of dimension names that may need regeneration
+    """
+    all_dimensions = [
+        "identity",
+        "offerings",
+        "differentiation",
+        "trust",
+        "experience",
+        "access",
+        "content",
+        "perception",
+        "decision_factors",
+        "vitality",
+        "campaigns",
+    ]
+
+    if not changed_urls:
+        return []
+
+    affected: set[str] = set()
+
+    for url in changed_urls:
+        url_lower = url.lower()
+        parsed = urlparse(url)
+        path = parsed.path.lower() if parsed.path else ""
+
+        is_homepage = (
+            path == "/" or path == "" or url_lower.endswith("/") and path == ""
+        )
+
+        if is_homepage:
+            affected.add("identity")
+            affected.add("offerings")
+            affected.add("access")
+            continue
+
+        for dimension, keywords in DIMENSION_CONTEXT_KEYWORDS.items():
+            if any(kw in url_lower or kw in path for kw in keywords):
+                affected.add(dimension)
+
+    if not affected:
+        return all_dimensions
+
+    return list(affected)
+
+
+def structure_brand_incremental(
+    url: str,
+    changed_pages: list[dict],
+    all_pages: list[dict],
+    clues: dict,
+    search_results: list[dict],
+    social_results: list[dict],
+    previous_result: dict,
+    changed_urls: list[str],
+) -> dict:
+    """Incrementally update brand knowledge base.
+
+    Only regenerates dimensions affected by changed URLs.
+    Unaffected dimensions are copied from previous_result.
+    """
+    from urllib.parse import urlparse
+
+    print("🔄 Incremental brand knowledge base update...")
+
+    if social_results is None:
+        social_results = []
+
+    affected_dimensions = _detect_affected_dimensions(changed_urls)
+    unaffected_dimensions = [
+        d
+        for d in [
+            "identity",
+            "offerings",
+            "differentiation",
+            "trust",
+            "experience",
+            "access",
+            "content",
+            "perception",
+            "decision_factors",
+            "vitality",
+            "campaigns",
+        ]
+        if d not in affected_dimensions
+    ]
+
+    print(
+        f"   🔄 增量更新: 重新生成 {len(affected_dimensions)}/11 个维度, 复用 {len(unaffected_dimensions)} 个维度"
+    )
+
+    with open(SCHEMA_PATH) as f:
+        schema = json.load(f)
+
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        futures = {}
+        for dim in affected_dimensions:
+            dim_schema = schema["properties"].get(dim, {"type": "object"})
+            ctx = _select_context_for_dimension(
+                dim,
+                all_pages if all_pages else changed_pages,
+                search_results,
+                social_results,
+                clues,
+            )
+            future = executor.submit(
+                _extract_dimension, dim, dim_schema, ctx, url, clues
+            )
+            futures[future] = dim
+
+        dimension_results = {}
+        for future in as_completed(futures):
+            dim = futures[future]
+            try:
+                result = future.result()
+                if result:
+                    dimension_results[dim] = result
+                    print(f"   ✅ {dim} extracted")
+                else:
+                    dimension_results[dim] = previous_result.get(dim, {})
+                    print(f"   ⚠️  {dim} failed, preserving previous")
+            except Exception as e:
+                dimension_results[dim] = previous_result.get(dim, {})
+                print(f"   ⚠️  {dim} extraction error: {e}, preserving previous")
+
+    final_result = {
+        "schema_version": "0.3.0",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "source_urls": list(set(previous_result.get("source_urls", []) + [url])),
+    }
+
+    for dim in unaffected_dimensions:
+        if dim in previous_result:
+            final_result[dim] = previous_result[dim]
+
+    for dim in affected_dimensions:
+        if dim in dimension_results:
+            final_result[dim] = dimension_results[dim]
+        elif dim in previous_result:
+            final_result[dim] = previous_result[dim]
+
+    for dim in ["identity", "offerings", "access"]:
+        if dim not in final_result:
+            final_result[dim] = previous_result.get(dim, {})
+
+    if "access" not in final_result:
+        final_result["access"] = {}
+    final_result["access"]["official_website"] = url
+    if url not in final_result.get("source_urls", []):
+        final_result.setdefault("source_urls", []).append(url)
+
+    print("   ✅ Incremental brand knowledge base generated")
+    return final_result
