@@ -12,7 +12,7 @@ TAVILY_ENDPOINT = "https://api.tavily.com/search"
 METASO_API_KEY = os.getenv("METASO_API_KEY", "mk-DA5C2447D54689CD7757A0C4AB162CA3")
 METASO_SEARCH_ENDPOINT = "https://metaso.cn/api/v1/search"
 METASO_READER_ENDPOINT = "https://metaso.cn/api/v1/reader"
-MAX_CRAWL_PAGES = 20
+MAX_CRAWL_PAGES = 30
 SCHEMA_PATH = os.path.join(
     os.path.dirname(os.path.dirname(__file__)), "schema", "brand_knowledge.schema.json"
 )
