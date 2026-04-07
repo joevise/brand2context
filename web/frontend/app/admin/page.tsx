@@ -26,6 +26,7 @@ import {
   getIndustryStats,
   retryIndustry,
   refreshIndustry,
+  refreshAllIndustry,
   IndustryStats,
 } from "@/lib/api";
 import {
@@ -509,6 +510,16 @@ export default function AdminPage() {
     }
   };
 
+  const handleRefreshAllIndustry = async (industry: string) => {
+    try {
+      const result = await refreshAllIndustry(industry);
+      alert(result.message);
+      fetchIndustryStats();
+    } catch {
+      alert("刷新全部失败");
+    }
+  };
+
   if (!authChecked) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-950 to-gray-900 flex items-center justify-center">
@@ -936,6 +947,15 @@ export default function AdminPage() {
                               <Play className="w-3 h-3" />
                               继续抓取
                             </button>
+                            {industry.done > 0 && (
+                              <button
+                                onClick={() => handleRefreshAllIndustry(industry.name)}
+                                className="px-3 py-1.5 rounded-lg bg-purple-600/20 text-purple-400 border border-purple-600/30 text-xs font-medium hover:bg-purple-600/30 transition flex items-center gap-1"
+                              >
+                                <RefreshCw className="w-3 h-3" />
+                                刷新全部
+                              </button>
+                            )}
                           </div>
 
                           {industry.last_updated && (

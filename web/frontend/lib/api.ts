@@ -394,6 +394,16 @@ export async function refreshIndustry(industry: string): Promise<{ message: stri
   return res.json();
 }
 
+export async function refreshAllIndustry(industry: string): Promise<{ message: string; count: number }> {
+  const res = await fetch(`${API_URL}/api/admin/industry/refresh-all`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+    body: JSON.stringify({ industry }),
+  });
+  if (!res.ok) throw new Error("Failed to refresh all industry");
+  return res.json();
+}
+
 export async function register(email: string, password: string, name: string): Promise<AuthResponse> {
   const res = await fetch(`${API_URL}/api/auth/register`, {
     method: "POST",

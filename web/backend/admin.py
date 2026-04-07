@@ -900,6 +900,23 @@ def launch_industry(
 
     seeds = _load_seeds()
     existing_urls = {s.get("url", "").rstrip("/") for s in seeds}
+
+    db_brands = db.query(Brand).all()
+    db_urls = {b.url.rstrip("/"): b for b in db_brands}
+    existing_urls.update(db_urls.keys())
+
+    for b in db_brands:
+        url = b.url.rstrip("/")
+        if url not in existing_urls:
+            entry = {
+                "name": b.name or "",
+                "url": b.url,
+                "category": b.category or body.industry,
+            }
+            seeds.append(entry)
+            existing_urls.add(url)
+    _save_seeds(seeds)
+
     added = []
     for b in new_brands:
         url = b.get("url", "").rstrip("/")
@@ -914,20 +931,29 @@ def launch_industry(
             existing_urls.add(url)
     _save_seeds(seeds)
 
-    settings = _load_settings()
-    cycle_days = settings["refresh_cycle_days"]
-    cutoff = datetime.now(timezone.utc) - timedelta(days=cycle_days)
-
-    all_brands = db.query(Brand).all()
-    url_map = {b.url.rstrip("/"): b for b in all_brands}
+    db_brands = db.query(Brand).all()
+    db_urls = {b.url.rstrip("/"): b for b in db_brands}
 
     to_crawl = []
     for entry in added:
         url = entry.get("url", "").rstrip("/")
-        brand = url_map.get(url)
+        brand = db_urls.get(url)
         if brand is None:
             to_crawl.append(entry)
-            url_map[url] = "pending"
+        elif brand.status == "error":
+            brand.status = "pending"
+            brand.error_message = None
+            brand.updated_at = datetime.now(timezone.utc)
+            to_crawl.append(
+                {
+                    "name": entry["name"],
+                    "url": entry["url"],
+                    "category": body.industry,
+                    "brand_id": brand.id,
+                }
+            )
+            db_urls[url] = "pending"
+        db.commit()
 
     if not to_crawl:
         return {
@@ -938,6 +964,7 @@ def launch_industry(
             "message": "All brands already exist in database",
         }
 
+    settings = _load_settings()
     batch_queue.max_concurrent = settings["max_concurrent"]
     task_id = batch_queue.start(to_crawl)
 
@@ -953,63 +980,48 @@ def launch_industry(
 def get_industry_stats(
     db: Session = Depends(get_db), current_user: User = Depends(get_current_admin_user)
 ):
-    seeds = _load_seeds()
-
+    brands = db.query(Brand).all()
     cats = {}
-    for s in seeds:
-        c = s.get("category", "") or "未分类"
-        if c not in cats:
-            cats[c] = {"total": 0, "urls": set()}
-        cats[c]["total"] += 1
-        cats[c]["urls"].add(s.get("url", "").rstrip("/"))
-
-    all_brands = db.query(Brand).all()
-    url_to_brand = {b.url.rstrip("/"): b for b in all_brands}
+    for b in brands:
+        cat = b.category or "未分类"
+        if cat not in cats:
+            cats[cat] = {
+                "total": 0,
+                "done": 0,
+                "processing": 0,
+                "error": 0,
+                "pending": 0,
+                "last_updated": None,
+            }
+        cats[cat]["total"] += 1
+        cats[cat][b.status] = cats[cat].get(b.status, 0) + 1
+        if b.updated_at and (
+            cats[cat]["last_updated"] is None
+            or b.updated_at > cats[cat]["last_updated"]
+        ):
+            cats[cat]["last_updated"] = b.updated_at
 
     stats = []
     for cat_name, cat_data in cats.items():
-        done = 0
-        processing = 0
-        error = 0
-        pending = 0
-        last_updated = None
-
-        for url in cat_data["urls"]:
-            brand = url_to_brand.get(url)
-            if brand:
-                if brand.status == "done":
-                    done += 1
-                    if brand.updated_at and (
-                        last_updated is None or brand.updated_at > last_updated
-                    ):
-                        last_updated = brand.updated_at
-                elif brand.status == "processing":
-                    processing += 1
-                elif brand.status == "error":
-                    error += 1
-                elif brand.status == "pending":
-                    pending += 1
-            else:
-                pending += 1
-
         total = cat_data["total"]
+        done = cat_data["done"]
         completion_rate = done / total if total > 0 else 0
-
         stats.append(
             {
                 "name": cat_name,
                 "total": total,
                 "done": done,
-                "processing": processing,
-                "error": error,
-                "pending": pending,
+                "processing": cat_data["processing"],
+                "error": cat_data["error"],
+                "pending": cat_data["pending"],
                 "completion_rate": round(completion_rate, 2),
-                "last_updated": last_updated.isoformat() if last_updated else None,
+                "last_updated": cat_data["last_updated"].isoformat()
+                if cat_data["last_updated"]
+                else None,
             }
         )
 
     stats.sort(key=lambda x: -x["completion_rate"])
-
     return {"industries": stats}
 
 
@@ -1112,4 +1124,57 @@ def refresh_industry(
         "task_id": task_id,
         "message": f"Refreshing {len(to_refresh)} brands in {body.industry}",
         "count": len(to_refresh),
+    }
+
+
+@admin_router.post("/industry/refresh-all")
+def refresh_all_industry(
+    body: IndustryRefreshRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    done_brands = (
+        db.query(Brand)
+        .filter(Brand.status == "done", Brand.category == body.industry)
+        .all()
+    )
+
+    if not done_brands:
+        return {"message": "No done brands to refresh", "count": 0}
+
+    to_crawl = []
+    for b in done_brands:
+        b.status = "pending"
+        b.error_message = None
+        b.updated_at = datetime.now(timezone.utc)
+        to_crawl.append(
+            {
+                "name": b.name or "",
+                "url": b.url,
+                "category": b.category or "",
+                "brand_id": b.id,
+            }
+        )
+    db.commit()
+
+    settings = _load_settings()
+    batch_queue.max_concurrent = settings["max_concurrent"]
+
+    batch_queue.task_id = str(uuid.uuid4())[:8]
+    batch_queue.completed = []
+    batch_queue.failed = []
+    batch_queue.running = {}
+    batch_queue.paused = False
+    batch_queue.total = len(to_crawl)
+
+    for item in to_crawl:
+        batch_queue.q.put(item)
+
+    if batch_queue._worker_thread is None or not batch_queue._worker_thread.is_alive():
+        batch_queue._worker_thread = threading.Thread(target=_retry_worker, daemon=True)
+        batch_queue._worker_thread.start()
+
+    return {
+        "message": f"Refreshing all {len(to_crawl)} done brands in {body.industry}",
+        "count": len(to_crawl),
     }
