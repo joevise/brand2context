@@ -122,7 +122,7 @@ def run_brand_pipeline(brand_id: str, url: str):
         db.commit()
 
         # Step 3: Web search expansion (works even without pages)
-        search_results = search_expand(clues)
+        search_results = search_expand(clues, pages=pages)
 
         # Step 3.5: If both crawl and search failed, try one more time with broader search
         if not pages and not search_results:

@@ -1,6 +1,9 @@
 """Step 1: Website crawling via link2context API."""
 
+import json
 import re
+import subprocess
+import tempfile
 import xml.etree.ElementTree as ET
 import requests
 from urllib.parse import urljoin, urlparse
@@ -96,30 +99,125 @@ def _score_page(url: str, sitemap_priority: float = 0.5) -> float:
     return max(0.0, min(1.0, score))
 
 
+def _convert_page_playwright(url: str) -> dict | None:
+    """Convert a single page using Playwright (headless Chromium).
+
+    This is a fallback when link2context API fails or returns insufficient content.
+    Uses subprocess to run Playwright in a separate process.
+    """
+    script = """
+import asyncio
+from playwright.async_api import async_playwright
+import json, sys
+
+async def main():
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True, args=["--no-sandbox"])
+        page = await browser.new_page()
+        await page.goto(sys.argv[1], wait_until="networkidle", timeout=30000)
+        title = await page.title()
+        text = await page.evaluate("() => document.body.innerText")
+        await browser.close()
+        print(json.dumps({"title": title, "content": text, "url": sys.argv[1]}))
+
+asyncio.run(main())
+"""
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=True) as f:
+            f.write(script)
+            script_path = f.name
+
+        result = subprocess.run(
+            ["python3", script_path, url],
+            capture_output=True,
+            text=True,
+            timeout=45,
+        )
+
+        if result.returncode == 0 and result.stdout.strip():
+            data = json.loads(result.stdout.strip())
+            return {
+                "url": data.get("url", url),
+                "title": data.get("title", ""),
+                "content": data.get("content", ""),
+            }
+    except subprocess.TimeoutExpired:
+        print(f"   ⏰ Playwright timeout for {url}")
+    except Exception as e:
+        print(f"   ⚠️ Playwright failed for {url}: {e}")
+
+    return None
+
+
+def _convert_page(url: str) -> dict | None:
+    """Convert a single page via link2context API with Playwright fallback."""
+    try:
+        resp = requests.post(
+            f"{LINK2CONTEXT_BASE}/api/convert",
+            json={"url": url},
+            timeout=60,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        if data.get("status") != "success":
+            return None
+        content = data.get("markdown", "")
+        title = data.get("title", url)
+
+        if len(content) < 200:
+            print(
+                f"   ⚠️ link2context returned too little content for {url}, trying Playwright..."
+            )
+            pw_result = _convert_page_playwright(url)
+            if pw_result:
+                return pw_result
+
+        return {"url": url, "title": title, "content": content}
+    except Exception:
+        print(f"   ⚠️ link2context failed, trying Playwright...")
+        return _convert_page_playwright(url)
+
+
 def crawl_site(url: str) -> list[dict]:
     """Crawl a website and return list of {url, content} dicts."""
     print(f"🕷️  Crawling {url} (max {MAX_CRAWL_PAGES} pages)...")
 
-    # Step 1: Try parsing sitemap.xml for full site URL list
     sitemap_urls = _parse_sitemap(url)
     sitemap_count = len(sitemap_urls)
     print(f"   📋 Sitemap found {sitemap_count} URLs")
 
-    # Step 2: Convert main page first
     main_page = _convert_page(url)
     if not main_page:
-        print("   ❌ Failed to crawl main page")
-        return []
+        print("   ❌ Failed to crawl main page via link2context")
+        all_urls = [
+            (u["url"], _score_page(u["url"], u.get("priority", 0.5)))
+            for u in sitemap_urls[:10]
+        ]
+        if not all_urls:
+            return []
+
+        print(
+            f"   🔄 Trying Playwright on top {min(5, len(all_urls))} high-priority URLs..."
+        )
+        pages = []
+        pw_success = 0
+        for u, score in all_urls[:5]:
+            page = _convert_page_playwright(u)
+            if page and len(page["content"]) > 100:
+                pages.append(page)
+                pw_success += 1
+                print(f"   ✅ [PW] {page['title'][:40]} ({len(page['content'])} chars)")
+
+        print(f"   📊 link2context: 0 pages, Playwright: {pw_success} pages")
+        return pages
 
     pages = [main_page]
     print(f"   ✅ Main page: {main_page['title']} ({len(main_page['content'])} chars)")
 
-    # Step 3: Extract internal links from main page content
     internal_links = _extract_internal_links(url, main_page["content"])
     internal_links_count = len(internal_links)
     print(f"   🔗 Found {internal_links_count} internal links")
 
-    # Step 4: Merge and deduplicate (sitemap + internal links)
     all_urls = []
     seen = {url}
 
@@ -140,10 +238,9 @@ def crawl_site(url: str) -> list[dict]:
         f"   🔄 Merged total: {merged_count} URLs (sitemap: {sitemap_count}, internal: {internal_links_count})"
     )
 
-    # Step 5: Sort by priority score descending
     all_urls.sort(key=lambda x: x[1], reverse=True)
 
-    # Step 6: Crawl top pages up to MAX_CRAWL_PAGES
+    link2context_success = 1
     for u, score in all_urls:
         if len(pages) >= MAX_CRAWL_PAGES:
             break
@@ -153,31 +250,13 @@ def crawl_site(url: str) -> list[dict]:
         page = _convert_page(u)
         if page and len(page["content"]) > 100:
             pages.append(page)
+            link2context_success += 1
             print(
                 f"   ✅ [{score:.2f}] {page['title'][:40]} ({len(page['content'])} chars)"
             )
 
-    print(f"   📄 Total: {len(pages)} pages crawled")
+    print(f"   📄 Total: {len(pages)} pages (link2context: {link2context_success})")
     return pages
-
-
-def _convert_page(url: str) -> dict | None:
-    """Convert a single page via link2context API."""
-    try:
-        resp = requests.post(
-            f"{LINK2CONTEXT_BASE}/api/convert",
-            json={"url": url},
-            timeout=60,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        if data.get("status") != "success":
-            return None
-        content = data.get("markdown", "")
-        title = data.get("title", url)
-        return {"url": url, "title": title, "content": content}
-    except Exception:
-        return None
 
 
 def _extract_internal_links(base_url: str, markdown_content: str) -> list[str]:
@@ -185,7 +264,6 @@ def _extract_internal_links(base_url: str, markdown_content: str) -> list[str]:
     parsed_base = urlparse(base_url)
     base_domain = parsed_base.netloc
 
-    # Find all markdown links: [text](url) and bare URLs
     link_pattern = r"\[([^\]]*)\]\(([^)]+)\)"
     matches = re.findall(link_pattern, markdown_content)
 
@@ -193,7 +271,6 @@ def _extract_internal_links(base_url: str, markdown_content: str) -> list[str]:
     seen = set()
 
     for text, href in matches:
-        # Skip anchors, images, external links, API paths
         if href.startswith("#") or href.startswith("mailto:"):
             continue
         if "/api/" in href or href.endswith(
@@ -201,15 +278,12 @@ def _extract_internal_links(base_url: str, markdown_content: str) -> list[str]:
         ):
             continue
 
-        # Resolve relative URLs
         full_url = urljoin(base_url, href)
         parsed = urlparse(full_url)
 
-        # Only keep same-domain links
         if parsed.netloc and parsed.netloc != base_domain:
             continue
 
-        # Normalize
         clean_url = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
         if clean_url.endswith("/"):
             clean_url = clean_url[:-1]
