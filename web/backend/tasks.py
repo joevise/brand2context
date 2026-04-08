@@ -25,43 +25,35 @@ def _fetch_logo(url: str) -> str:
 
         import httpx
 
-        clearbit_url = f"https://logo.clearbit.com/{domain}"
-        resp = httpx.get(clearbit_url, timeout=10.0, follow_redirects=True)
-        if resp.status_code == 200:
-            logo_url = clearbit_url
-    except Exception:
-        pass
-
-    if not logo_url:
+        debounce_url = f"https://logo.debounce.com/{domain}"
         try:
-            import httpx
+            resp = httpx.head(debounce_url, timeout=10.0, follow_redirects=True)
+            content_type = resp.headers.get("content-type", "")
+            if resp.status_code == 200 and "image" in content_type:
+                logo_url = debounce_url
+        except Exception:
+            pass
 
-            resp = httpx.get(url, timeout=10.0, follow_redirects=True)
-            html = resp.text
+        if not logo_url:
+            try:
+                resp = httpx.get(url, timeout=10.0, follow_redirects=True)
+                html = resp.text
 
-            og_image = re.search(
-                r'<meta[^>]*property=["\']og:image["\'][^>]*content=["\']([^"\']+)["\']',
-                html,
-                re.I,
-            )
-            if og_image:
-                logo_url = og_image.group(1)
-            else:
-                icons = re.findall(
-                    r'<link[^>]*rel=["\'](?:icon|shortcut icon)["\'][^>]*href=["\']([^"\']+)["\']',
+                og_image = re.search(
+                    r'<meta[^>]*property=["\']og:image["\'][^>]*content=["\']([^"\']+)["\']',
                     html,
                     re.I,
                 )
-                if icons:
-                    icon_href = icons[0]
-                    if icon_href.startswith("http"):
-                        logo_url = icon_href
-                    elif icon_href.startswith("//"):
-                        logo_url = "https:" + icon_href
-                    elif icon_href.startswith("/"):
-                        logo_url = f"{urlparse(url).scheme}://{urlparse(url).netloc}{icon_href}"
-        except Exception:
-            pass
+                if og_image:
+                    logo_url = og_image.group(1)
+            except Exception:
+                pass
+
+        if not logo_url:
+            logo_url = f"https://www.google.com/s2/favicons?domain={domain}&sz=128"
+
+    except Exception:
+        pass
 
     return logo_url
 
@@ -291,7 +283,12 @@ def run_brand_pipeline(brand_id: str, url: str):
             if result is None:
                 return
 
-        brand_name = result.get("identity", {}).get("name", "Unknown Brand")
+        brand_name = result.get("identity", {}).get("name", "")
+        if not brand_name or brand_name == "Unknown Brand":
+            brand_name = brand.name or ""
+        if not brand_name:
+            domain = urlparse(url).netloc.replace("www.", "").split(".")[0]
+            brand_name = domain.capitalize()
         brand.name = brand_name
         brand.slug = generate_slug(brand_name, db)
         brand.description = result.get("identity", {}).get("tagline", "") or result.get(

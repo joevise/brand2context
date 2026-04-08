@@ -611,7 +611,7 @@ function DifferentiationSection({ data, editMode, onUpdate }: { data: any; editM
         )}
         {data.awards?.length > 0 && (
           <EditableField editMode={editMode} onClick={() => setEditObjArr("awards")}>
-            <div><h4 className="text-sm font-medium mb-2">荣誉奖项</h4>{data.awards.map((a: any, i: number) => <div key={i} className="flex items-center gap-2 text-sm"><Award className="w-4 h-4 text-yellow-500" />{a.name} {a.year && `(${a.year})`}</div>)}</div>
+            <div><h4 className="text-sm font-medium mb-2">荣誉奖项</h4>{data.awards.map((a: any, i: number) => <div key={i} className="flex items-center gap-2 text-sm"><Award className="w-4 h-4 text-yellow-500" />{a.source_url ? <a href={a.source_url} target="_blank" rel="noopener" className="text-xs text-primary-600 hover:underline">{a.name}</a> : a.name} {a.year && `(${a.year})`}</div>)}</div>
           </EditableField>
         )}
       </div>
@@ -642,7 +642,7 @@ function TrustSection({ data, editMode, onUpdate }: { data: any; editMode: boole
         {data.certifications?.length > 0 && <EditableField editMode={editMode} onClick={() => setEditField("certifications")}><div><h4 className="text-sm font-medium mb-2">资质认证</h4><div className="flex flex-wrap gap-2">{data.certifications.map((c: string, i: number) => <Tag key={i}>{c}</Tag>)}</div></div></EditableField>}
         {data.partnerships?.length > 0 && <EditableField editMode={editMode} onClick={() => setEditField("partnerships")}><div><h4 className="text-sm font-medium mb-2">合作伙伴</h4><div className="flex flex-wrap gap-2">{data.partnerships.map((p: string, i: number) => <Tag key={i}>{p}</Tag>)}</div></div></EditableField>}
         {data.user_stats?.length > 0 && <EditableField editMode={editMode} onClick={() => setEditObjArr("user_stats")}><div className="grid grid-cols-2 sm:grid-cols-3 gap-3">{data.user_stats.map((s: any, i: number) => <div key={i} className="p-3 rounded-xl bg-[var(--muted)] text-center"><div className="text-lg font-bold text-primary-600">{s.value}</div><div className="text-xs text-[var(--muted-foreground)]">{s.metric}</div></div>)}</div></EditableField>}
-        {data.testimonials?.length > 0 && <EditableField editMode={editMode} onClick={() => setEditObjArr("testimonials")}><div className="space-y-3">{data.testimonials.map((t: any, i: number) => <blockquote key={i} className="border-l-2 border-primary-600 pl-4 italic text-sm text-[var(--muted-foreground)]">&ldquo;{t.quote}&rdquo; — {t.source}</blockquote>)}</div></EditableField>}
+        {data.testimonials?.length > 0 && <EditableField editMode={editMode} onClick={() => setEditObjArr("testimonials")}><div className="space-y-3">{data.testimonials.map((t: any, i: number) => <blockquote key={i} className="border-l-2 border-primary-600 pl-4 italic text-sm text-[var(--muted-foreground)]">&ldquo;{t.quote}&rdquo; — {t.source}{t.source_url && <><br /><a href={t.source_url} target="_blank" rel="noopener" className="text-xs text-primary-600 hover:underline mt-1 inline-block">查看来源 →</a></>}</blockquote>)}</div></EditableField>}
       </div>
     </Section>
   );
@@ -735,6 +735,7 @@ function ContentSection({ data, editMode, onUpdate }: { data: any; editMode: boo
               {n.date && <span className="text-xs text-[var(--muted-foreground)] flex-shrink-0 ml-2">{n.date}</span>}
             </div>
             {(n.summary || n.content) && <p className="text-xs text-[var(--muted-foreground)] mt-1">{n.summary || n.content}</p>}
+            {(n.source_url || n.url) && <a href={n.source_url || n.url} target="_blank" rel="noopener" className="text-xs text-primary-600 hover:underline mt-1 inline-block">查看来源 →</a>}
           </div>
         ))}
         {editMode && (
@@ -896,6 +897,7 @@ function CampaignsSection({ data, editMode, onUpdate }: { data: any; editMode: b
                 {item.date && <p className="text-xs text-[var(--muted-foreground)]">{item.date}</p>}
                 {item.summary && <p className="text-xs text-[var(--muted-foreground)] mt-1">{item.summary}</p>}
                 {item.impact && <p className="text-xs mt-1"><strong>效果：</strong>{item.impact}</p>}
+                {item.source_url && <a href={item.source_url} target="_blank" rel="noopener" className="text-xs text-primary-600 hover:underline mt-1 inline-block">查看来源 →</a>}
               </div>
             ))}
           </div>
