@@ -1178,3 +1178,204 @@ def refresh_all_industry(
         "message": f"Refreshing all {len(to_crawl)} done brands in {body.industry}",
         "count": len(to_crawl),
     }
+
+
+# ============================================================
+# Brand Management
+# ============================================================
+
+
+@admin_router.get("/brands")
+def list_admin_brands(
+    page: int = 1,
+    per_page: int = 20,
+    category: Optional[str] = None,
+    status: Optional[str] = None,
+    q: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    query = db.query(Brand)
+
+    if category:
+        query = query.filter(Brand.category == category)
+    if status:
+        query = query.filter(Brand.status == status)
+    if q:
+        query = query.filter(Brand.name.ilike(f"%{q}%"))
+
+    total = query.count()
+    brands = (
+        query.order_by(Brand.created_at.desc())
+        .offset((page - 1) * per_page)
+        .limit(per_page)
+        .all()
+    )
+
+    return {
+        "brands": [
+            {
+                "id": b.id,
+                "name": b.name,
+                "url": b.url,
+                "category": b.category,
+                "status": b.status,
+                "logo_url": b.logo_url,
+                "description": b.description,
+                "created_at": b.created_at.isoformat() if b.created_at else None,
+                "updated_at": b.updated_at.isoformat() if b.updated_at else None,
+                "last_refreshed": b.last_refreshed.isoformat()
+                if b.last_refreshed
+                else None,
+            }
+            for b in brands
+        ],
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+    }
+
+
+class BrandUpdate(BaseModel):
+    name: Optional[str] = None
+    category: Optional[str] = None
+    url: Optional[str] = None
+    description: Optional[str] = None
+
+
+@admin_router.put("/brands/{brand_id}")
+def update_admin_brand(
+    brand_id: str,
+    body: BrandUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    brand = db.query(Brand).filter(Brand.id == brand_id).first()
+    if not brand:
+        raise HTTPException(status_code=404, detail="Brand not found")
+
+    if body.name is not None:
+        brand.name = body.name
+    if body.category is not None:
+        brand.category = body.category
+    if body.url is not None:
+        brand.url = body.url
+    if body.description is not None:
+        brand.description = body.description
+
+    brand.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(brand)
+
+    return {
+        "id": brand.id,
+        "name": brand.name,
+        "url": brand.url,
+        "category": brand.category,
+        "status": brand.status,
+        "logo_url": brand.logo_url,
+        "description": brand.description,
+        "created_at": brand.created_at.isoformat() if brand.created_at else None,
+        "updated_at": brand.updated_at.isoformat() if brand.updated_at else None,
+        "last_refreshed": brand.last_refreshed.isoformat()
+        if brand.last_refreshed
+        else None,
+    }
+
+
+@admin_router.delete("/brands/{brand_id}")
+def delete_admin_brand(
+    brand_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    brand = db.query(Brand).filter(Brand.id == brand_id).first()
+    if not brand:
+        raise HTTPException(status_code=404, detail="Brand not found")
+
+    db.delete(brand)
+    db.commit()
+
+    json_path = os.path.join(
+        os.path.dirname(__file__), "data", "brands", f"{brand_id}.json"
+    )
+    if os.path.exists(json_path):
+        os.remove(json_path)
+
+    return {"message": "Deleted"}
+
+
+class BatchDeleteRequest(BaseModel):
+    brand_ids: list[str]
+
+
+@admin_router.post("/brands/batch-delete")
+def batch_delete_brands(
+    body: BatchDeleteRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    count = 0
+    data_dir = os.path.join(os.path.dirname(__file__), "data", "brands")
+    for brand_id in body.brand_ids:
+        brand = db.query(Brand).filter(Brand.id == brand_id).first()
+        if brand:
+            db.delete(brand)
+            count += 1
+            json_path = os.path.join(data_dir, f"{brand_id}.json")
+            if os.path.exists(json_path):
+                os.remove(json_path)
+    db.commit()
+    return {"message": f"Deleted {count} brands", "count": count}
+
+
+@admin_router.post("/brands/batch-refresh")
+def batch_refresh_brands(
+    body: BatchDeleteRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    count = 0
+    for brand_id in body.brand_ids:
+        brand = db.query(Brand).filter(Brand.id == brand_id).first()
+        if brand:
+            brand.status = "pending"
+            brand.error_message = None
+            brand.updated_at = datetime.now(timezone.utc)
+            db.commit()
+            batch_queue.q.put(
+                {
+                    "name": brand.name or "",
+                    "url": brand.url,
+                    "category": brand.category or "",
+                    "brand_id": brand.id,
+                }
+            )
+            count += 1
+    return {"message": f"Queued {count} brands for refresh", "count": count}
+
+
+@admin_router.post("/brands/{brand_id}/refresh")
+def refresh_single_brand(
+    brand_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    brand = db.query(Brand).filter(Brand.id == brand_id).first()
+    if not brand:
+        raise HTTPException(status_code=404, detail="Brand not found")
+
+    brand.status = "pending"
+    brand.error_message = None
+    brand.updated_at = datetime.now(timezone.utc)
+    db.commit()
+
+    batch_queue.q.put(
+        {
+            "name": brand.name or "",
+            "url": brand.url,
+            "category": brand.category or "",
+            "brand_id": brand.id,
+        }
+    )
+    return {"message": "Queued for refresh"}

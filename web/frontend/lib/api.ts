@@ -447,3 +447,65 @@ export async function createBrandWithName(url: string, name?: string, category?:
   if (!res.ok) throw new Error("Failed to create brand");
   return res.json();
 }
+
+export async function getAdminBrands(params: {page?: number; per_page?: number; category?: string; status?: string; q?: string}): Promise<{brands: Brand[]; total: number; page: number; per_page: number}> {
+  const urlParams = new URLSearchParams();
+  if (params.page) urlParams.set("page", params.page.toString());
+  if (params.per_page) urlParams.set("per_page", params.per_page.toString());
+  if (params.category) urlParams.set("category", params.category);
+  if (params.status) urlParams.set("status", params.status);
+  if (params.q) urlParams.set("q", params.q);
+  const res = await fetch(`${API_URL}/api/admin/brands?${urlParams}`, {
+    cache: "no-store",
+    headers: { ...getAuthHeaders() },
+  });
+  if (!res.ok) throw new Error("Failed to fetch admin brands");
+  return res.json();
+}
+
+export async function updateBrand(brandId: string, data: {name?: string; category?: string; url?: string; description?: string}): Promise<Brand> {
+  const res = await fetch(`${API_URL}/api/admin/brands/${brandId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error("Failed to update brand");
+  return res.json();
+}
+
+export async function adminDeleteBrand(brandId: string): Promise<void> {
+  const res = await fetch(`${API_URL}/api/admin/brands/${brandId}`, {
+    method: "DELETE",
+    headers: { ...getAuthHeaders() },
+  });
+  if (!res.ok) throw new Error("Failed to delete brand");
+}
+
+export async function batchDeleteBrands(brandIds: string[]): Promise<{message: string; count: number}> {
+  const res = await fetch(`${API_URL}/api/admin/brands/batch-delete`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+    body: JSON.stringify({ brand_ids: brandIds }),
+  });
+  if (!res.ok) throw new Error("Failed to batch delete brands");
+  return res.json();
+}
+
+export async function batchRefreshBrands(brandIds: string[]): Promise<{message: string; count: number}> {
+  const res = await fetch(`${API_URL}/api/admin/brands/batch-refresh`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+    body: JSON.stringify({ brand_ids: brandIds }),
+  });
+  if (!res.ok) throw new Error("Failed to batch refresh brands");
+  return res.json();
+}
+
+export async function refreshBrand(brandId: string): Promise<{message: string}> {
+  const res = await fetch(`${API_URL}/api/admin/brands/${brandId}/refresh`, {
+    method: "POST",
+    headers: { ...getAuthHeaders() },
+  });
+  if (!res.ok) throw new Error("Failed to refresh brand");
+  return res.json();
+}

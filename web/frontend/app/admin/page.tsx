@@ -28,6 +28,13 @@ import {
   refreshIndustry,
   refreshAllIndustry,
   IndustryStats,
+  getAdminBrands,
+  updateBrand,
+  adminDeleteBrand,
+  batchDeleteBrands,
+  batchRefreshBrands,
+  refreshBrand,
+  Brand,
 } from "@/lib/api";
 import {
   LayoutDashboard,
@@ -51,6 +58,11 @@ import {
   Shield,
   Rocket,
   Building2,
+  Pencil,
+  Trash2,
+  ChevronLeft,
+  ChevronRight,
+  CheckSquare,
 } from "lucide-react";
 
 const STATUS_COLORS = {
@@ -59,6 +71,7 @@ const STATUS_COLORS = {
   outdated: "bg-orange-500/20 text-orange-400 border-orange-500/30",
   processing: "bg-blue-500/20 text-blue-400 border-blue-500/30 animate-pulse",
   error: "bg-red-500/20 text-red-400 border-red-500/30",
+  pending: "bg-gray-500/20 text-gray-400 border-gray-500/30",
 };
 
 const STATUS_ICONS = {
@@ -67,6 +80,7 @@ const STATUS_ICONS = {
   outdated: <RefreshCw className="w-3 h-3" />,
   processing: <Loader2 className="w-3 h-3 animate-spin" />,
   error: <XCircle className="w-3 h-3" />,
+  pending: <Clock className="w-3 h-3" />,
 };
 
 function Modal({
@@ -294,7 +308,7 @@ function ManualAddModal({
 }
 
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState<"seeds" | "batch" | "refresh" | "industry">("seeds");
+  const [activeTab, setActiveTab] = useState<"seeds" | "batch" | "refresh" | "industry" | "brands">("seeds");
   const [dashboard, setDashboard] = useState<AdminDashboard | null>(null);
   const [seeds, setSeeds] = useState<Seed[]>([]);
   const [seedsTotal, setSeedsTotal] = useState(0);
@@ -318,6 +332,15 @@ export default function AdminPage() {
   const [launchLoading, setLaunchLoading] = useState(false);
   const [launchIndustryName, setLaunchIndustryName] = useState("");
   const [launchCount, setLaunchCount] = useState(30);
+  const [adminBrands, setAdminBrands] = useState<Brand[]>([]);
+  const [adminBrandsTotal, setAdminBrandsTotal] = useState(0);
+  const [adminBrandsPage, setAdminBrandsPage] = useState(1);
+  const [adminBrandsCategory, setAdminBrandsCategory] = useState("all");
+  const [adminBrandsStatus, setAdminBrandsStatus] = useState("all");
+  const [adminBrandsSearch, setAdminBrandsSearch] = useState("");
+  const [selectedBrandIds, setSelectedBrandIds] = useState<Set<string>>(new Set());
+  const [editingBrand, setEditingBrand] = useState<Brand | null>(null);
+  const brandsPollingRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchDashboard = useCallback(async () => {
     try {
@@ -366,6 +389,18 @@ export default function AdminPage() {
     } catch {}
   }, []);
 
+  const fetchAdminBrands = useCallback(async () => {
+    try {
+      const params: any = { page: adminBrandsPage, per_page: 20 };
+      if (adminBrandsCategory !== "all") params.category = adminBrandsCategory;
+      if (adminBrandsStatus !== "all") params.status = adminBrandsStatus;
+      if (adminBrandsSearch) params.q = adminBrandsSearch;
+      const data = await getAdminBrands(params);
+      setAdminBrands(data.brands);
+      setAdminBrandsTotal(data.total);
+    } catch {}
+  }, [adminBrandsPage, adminBrandsCategory, adminBrandsStatus, adminBrandsSearch]);
+
   useEffect(() => {
     const checkAuth = async () => {
       try {
@@ -396,14 +431,18 @@ export default function AdminPage() {
     } else if (activeTab === "industry") {
       fetchIndustryStats();
       pollingRef.current = setInterval(fetchIndustryStats, 10000);
+    } else if (activeTab === "brands") {
+      fetchAdminBrands();
+      brandsPollingRef.current = setInterval(fetchAdminBrands, 10000);
     } else if (pollingRef.current) {
       clearInterval(pollingRef.current);
       pollingRef.current = null;
     }
     return () => {
       if (pollingRef.current) clearInterval(pollingRef.current);
+      if (brandsPollingRef.current) clearInterval(brandsPollingRef.current);
     };
-  }, [activeTab, fetchBatchStatus, fetchIndustryStats]);
+  }, [activeTab, fetchBatchStatus, fetchIndustryStats, fetchAdminBrands]);
 
   useEffect(() => {
     if (activeTab === "refresh") {
@@ -422,6 +461,12 @@ export default function AdminPage() {
       fetchSeeds();
     }
   }, [selectedCategory, loading, authChecked, fetchSeeds]);
+
+  useEffect(() => {
+    if (activeTab === "brands" && authChecked) {
+      fetchAdminBrands();
+    }
+  }, [activeTab, authChecked, fetchAdminBrands]);
 
   const handleStartBatch = async () => {
     try {
@@ -640,7 +685,10 @@ export default function AdminPage() {
             {industryStats.slice(0, 10).map((industry) => (
               <button
                 key={industry.name}
-                onClick={() => setActiveTab("industry")}
+                onClick={() => {
+                  setAdminBrandsCategory(industry.name);
+                  setActiveTab("brands");
+                }}
                 className="flex-shrink-0 rounded-xl border border-gray-700 bg-gray-800/50 p-3 min-w-[140px] hover:bg-gray-800/80 transition"
               >
                 <div className="text-sm font-medium mb-2 truncate">{industry.name}</div>
@@ -733,6 +781,17 @@ export default function AdminPage() {
             >
               <Building2 className="w-4 h-4 inline mr-2" />
               行业管理
+            </button>
+            <button
+              onClick={() => setActiveTab("brands")}
+              className={`px-6 py-3 text-sm font-medium transition ${
+                activeTab === "brands"
+                  ? "text-primary-400 border-b-2 border-primary-400 bg-primary-950/20"
+                  : "text-gray-400 hover:text-gray-200"
+              }`}
+            >
+              <Database className="w-4 h-4 inline mr-2" />
+              品牌管理
             </button>
             <button
               onClick={() => setActiveTab("batch")}
@@ -966,6 +1025,245 @@ export default function AdminPage() {
                         </div>
                       );
                     })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === "brands" && (
+              <div>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="relative flex-1 max-w-md">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="text"
+                      value={adminBrandsSearch}
+                      onChange={(e) => {
+                        setAdminBrandsSearch(e.target.value);
+                        setAdminBrandsPage(1);
+                      }}
+                      placeholder="搜索品牌名称..."
+                      className="w-full pl-10 pr-4 py-2 rounded-lg bg-gray-800 border border-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600"
+                    />
+                  </div>
+                  <select
+                    value={adminBrandsCategory}
+                    onChange={(e) => {
+                      setAdminBrandsCategory(e.target.value);
+                      setAdminBrandsPage(1);
+                    }}
+                    className="px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600"
+                  >
+                    <option value="all">全品类</option>
+                    {seedsCategories.map((cat) => (
+                      <option key={cat.name} value={cat.name}>{cat.name}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={adminBrandsStatus}
+                    onChange={(e) => {
+                      setAdminBrandsStatus(e.target.value);
+                      setAdminBrandsPage(1);
+                    }}
+                    className="px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600"
+                  >
+                    <option value="all">全部状态</option>
+                    <option value="done">已完成</option>
+                    <option value="processing">处理中</option>
+                    <option value="pending">等待中</option>
+                    <option value="error">失败</option>
+                  </select>
+                  <button
+                    onClick={() => fetchAdminBrands()}
+                    className="px-3 py-2 rounded-lg bg-blue-600/20 text-blue-400 border border-blue-600/30 text-sm font-medium hover:bg-blue-600/30 transition flex items-center gap-1"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    刷新
+                  </button>
+                </div>
+
+                <div className="rounded-xl border border-gray-700 overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-gray-400 border-b border-gray-700 bg-gray-800/50">
+                        <th className="px-4 py-3 font-medium w-10">
+                          <input
+                            type="checkbox"
+                            checked={adminBrands.length > 0 && selectedBrandIds.size === adminBrands.length}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedBrandIds(new Set(adminBrands.map(b => b.id)));
+                              } else {
+                                setSelectedBrandIds(new Set());
+                              }
+                            }}
+                            className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-primary-600 focus:ring-primary-600"
+                          />
+                        </th>
+                        <th className="px-4 py-3 font-medium">Logo+名称</th>
+                        <th className="px-4 py-3 font-medium">URL</th>
+                        <th className="px-4 py-3 font-medium">品类</th>
+                        <th className="px-4 py-3 font-medium">状态</th>
+                        <th className="px-4 py-3 font-medium">更新时间</th>
+                        <th className="px-4 py-3 font-medium w-32">操作</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {adminBrands.map((brand) => (
+                        <tr key={brand.id} className="border-b border-gray-800/50 hover:bg-gray-800/30 transition">
+                          <td className="px-4 py-3">
+                            <input
+                              type="checkbox"
+                              checked={selectedBrandIds.has(brand.id)}
+                              onChange={(e) => {
+                                const newSet = new Set(selectedBrandIds);
+                                if (e.target.checked) {
+                                  newSet.add(brand.id);
+                                } else {
+                                  newSet.delete(brand.id);
+                                }
+                                setSelectedBrandIds(newSet);
+                              }}
+                              className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-primary-600 focus:ring-primary-600"
+                            />
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              {brand.logo_url ? (
+                                <img src={brand.logo_url} alt="" className="w-8 h-8 rounded-lg object-contain bg-white" />
+                              ) : (
+                                <div className="w-8 h-8 rounded-lg bg-gray-700 flex items-center justify-center text-xs">
+                                  {(brand.name || brand.url).charAt(0).toUpperCase()}
+                                </div>
+                              )}
+                              <span className="font-medium">{brand.name || "(unnamed)"}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-gray-400 truncate max-w-[200px]">{brand.url}</td>
+                          <td className="px-4 py-3 text-gray-400">{brand.category || "-"}</td>
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs border ${STATUS_COLORS[brand.status]}`}>
+                              {STATUS_ICONS[brand.status]}
+                              {brand.status === "done" ? "已完成" : brand.status === "processing" ? "处理中" : brand.status === "error" ? "失败" : "等待中"}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-gray-400 text-xs">
+                            {brand.updated_at ? new Date(brand.updated_at).toLocaleDateString() : "-"}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => setEditingBrand(brand)}
+                                className="p-1.5 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-primary-400 transition"
+                                title="编辑"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={async () => {
+                                  if (!window.confirm(`确定要刷新 "${brand.name || brand.url}" 吗？`)) return;
+                                  try {
+                                    await refreshBrand(brand.id);
+                                    fetchAdminBrands();
+                                  } catch {}
+                                }}
+                                className="p-1.5 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-blue-400 transition"
+                                title="刷新"
+                              >
+                                <RotateCcw className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={async () => {
+                                  if (!window.confirm(`确定要删除 "${brand.name || brand.url}" 吗？`)) return;
+                                  try {
+                                    await adminDeleteBrand(brand.id);
+                                    fetchAdminBrands();
+                                  } catch {}
+                                }}
+                                className="p-1.5 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-red-400 transition"
+                                title="删除"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {adminBrands.length === 0 && (
+                    <div className="text-center py-12 text-gray-500">暂无品牌数据</div>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between mt-4">
+                  <div className="text-sm text-gray-400">
+                    共 {adminBrandsTotal} 个品牌，第 {adminBrandsPage} / {Math.ceil(adminBrandsTotal / 20) || 1} 页
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setAdminBrandsPage(Math.max(1, adminBrandsPage - 1))}
+                      disabled={adminBrandsPage <= 1}
+                      className="px-3 py-1.5 rounded-lg bg-gray-800 border border-gray-700 text-sm hover:bg-gray-700 disabled:opacity-50 transition flex items-center gap-1"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                      上一页
+                    </button>
+                    <button
+                      onClick={() => setAdminBrandsPage(adminBrandsPage + 1)}
+                      disabled={adminBrandsPage >= Math.ceil(adminBrandsTotal / 20)}
+                      className="px-3 py-1.5 rounded-lg bg-gray-800 border border-gray-700 text-sm hover:bg-gray-700 disabled:opacity-50 transition flex items-center gap-1"
+                    >
+                      下一页
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {selectedBrandIds.size > 0 && (
+                  <div className="fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-700 p-4 z-40">
+                    <div className="max-w-7xl mx-auto flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <CheckSquare className="w-5 h-5 text-primary-400" />
+                        <span className="text-sm">已选 <span className="text-primary-400 font-medium">{selectedBrandIds.size}</span> 个</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={async () => {
+                            if (!window.confirm(`确定要删除选中的 ${selectedBrandIds.size} 个品牌吗？`)) return;
+                            try {
+                              await batchDeleteBrands(Array.from(selectedBrandIds));
+                              setSelectedBrandIds(new Set());
+                              fetchAdminBrands();
+                            } catch {}
+                          }}
+                          className="px-4 py-2 rounded-lg bg-red-600/20 text-red-400 border border-red-600/30 text-sm font-medium hover:bg-red-600/30 transition flex items-center gap-2"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          批量删除
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (!window.confirm(`确定要刷新选中的 ${selectedBrandIds.size} 个品牌吗？`)) return;
+                            try {
+                              await batchRefreshBrands(Array.from(selectedBrandIds));
+                              setSelectedBrandIds(new Set());
+                              fetchAdminBrands();
+                            } catch {}
+                          }}
+                          className="px-4 py-2 rounded-lg bg-blue-600/20 text-blue-400 border border-blue-600/30 text-sm font-medium hover:bg-blue-600/30 transition flex items-center gap-2"
+                        >
+                          <RotateCcw className="w-4 h-4" />
+                          批量刷新
+                        </button>
+                        <button
+                          onClick={() => setSelectedBrandIds(new Set())}
+                          className="px-4 py-2 rounded-lg bg-gray-800 border border-gray-700 text-sm hover:bg-gray-700 transition"
+                        >
+                          取消选择
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1235,6 +1533,107 @@ export default function AdminPage() {
           fetchDashboard();
         }}
       />
+      {editingBrand && (
+        <EditBrandModal
+          brand={editingBrand}
+          onClose={() => setEditingBrand(null)}
+          onSuccess={() => {
+            setEditingBrand(null);
+            fetchAdminBrands();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function EditBrandModal({
+  brand,
+  onClose,
+  onSuccess,
+}: {
+  brand: Brand;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [name, setName] = useState(brand.name || "");
+  const [category, setCategory] = useState(brand.category || "");
+  const [url] = useState(brand.url || "");
+  const [description, setDescription] = useState(brand.description || "");
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await updateBrand(brand.id, {
+        name: name.trim() || undefined,
+        category: category.trim() || undefined,
+        description: description.trim() || undefined,
+      });
+      onSuccess();
+    } catch {} finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+      <div className="relative bg-[var(--card)] rounded-xl p-6 w-full max-w-md shadow-2xl border border-[var(--border)]">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold">编辑品牌</h3>
+          <button onClick={onClose} className="p-1 rounded hover:bg-[var(--muted)]">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit}>
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-2">名称</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] focus:outline-none focus:ring-2 focus:ring-primary-600"
+            />
+          </div>
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-2">品类</label>
+            <input
+              type="text"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] focus:outline-none focus:ring-2 focus:ring-primary-600"
+            />
+          </div>
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-2">URL</label>
+            <input
+              type="text"
+              value={url}
+              disabled
+              className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-gray-800 text-gray-500 cursor-not-allowed"
+            />
+          </div>
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-2">描述</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
+              className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] focus:outline-none focus:ring-2 focus:ring-primary-600 resize-none"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-2 rounded-lg bg-primary-600 hover:bg-primary-700 text-white font-medium transition disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+            保存
+          </button>
+        </form>
+      </div>
     </div>
   );
 }
