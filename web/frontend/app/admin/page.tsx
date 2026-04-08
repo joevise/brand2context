@@ -378,7 +378,7 @@ export default function AdminPage() {
         }
         setAuthChecked(true);
         setLoading(true);
-        await Promise.all([fetchDashboard(), fetchSeeds(), fetchSettings()]);
+        await Promise.all([fetchDashboard(), fetchSeeds(), fetchSettings(), fetchIndustryStats()]);
         setLoading(false);
       } catch {
         setUser(null);
@@ -387,7 +387,7 @@ export default function AdminPage() {
       }
     };
     checkAuth();
-  }, [fetchDashboard, fetchSeeds, fetchSettings]);
+  }, [fetchDashboard, fetchSeeds, fetchSettings, fetchIndustryStats]);
 
   useEffect(() => {
     if (activeTab === "batch") {
