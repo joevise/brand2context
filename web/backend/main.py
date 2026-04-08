@@ -763,6 +763,197 @@ def get_brand_stats(brand_id: str, db: Session = Depends(get_db)):
     }
 
 
+DIMENSION_FIELD_MAP = {
+    "identity": [
+        "name",
+        "tagline",
+        "positioning",
+        "category",
+        "founded",
+        "headquarters",
+        "founder",
+        "scale",
+        "mission",
+        "vision",
+        "values",
+        "brand_story",
+    ],
+    "offerings": [],
+    "differentiation": [
+        "unique_selling_points",
+        "competitive_advantages",
+        "technology_highlights",
+        "awards",
+    ],
+    "trust": ["certifications", "partnerships", "user_stats", "testimonials"],
+    "experience": ["warranty", "return_policy", "onboarding", "community", "faq"],
+    "access": ["official_website", "contact", "social_media"],
+    "content": ["latest_news", "key_announcements", "blog_posts"],
+    "perception": [
+        "personality_traits",
+        "brand_tone",
+        "price_positioning",
+        "price_benchmark",
+        "category_association",
+        "primary_audience",
+        "usage_occasions",
+    ],
+    "decision_factors": [
+        "category_key_factors",
+        "perceived_risks",
+        "switching_cost",
+        "trial_barrier",
+    ],
+    "vitality": [
+        "content_frequency",
+        "last_product_launch",
+        "last_campaign",
+        "growth_signal",
+        "community_size",
+        "nps_or_satisfaction",
+        "market_position",
+        "industry_role",
+    ],
+    "campaigns": ["ongoing", "recent", "upcoming", "annual_events"],
+}
+
+
+def _evaluate_dimension(dim: str, data: any) -> dict:
+    fields = DIMENSION_FIELD_MAP.get(dim, [])
+    filled = []
+    missing = []
+    score = 0
+
+    if data is None or data == {}:
+        return {
+            "score": 0,
+            "filled": [],
+            "missing": fields or [],
+            "status": "empty",
+            "reason": "No data extracted",
+        }
+
+    if dim == "offerings":
+        if isinstance(data, list) and len(data) > 0:
+            filled_count = sum(
+                1 for item in data if isinstance(item, dict) and any(item.values())
+            )
+            score = min(100, int(filled_count / len(data) * 100))
+            filled = [f"item_{i}" for i in range(len(data))]
+            missing = []
+            status = "complete" if filled_count == len(data) else "partial"
+            reason = f"{filled_count}/{len(data)} offerings with data"
+        else:
+            score = 0
+            missing = ["offerings list"]
+            status = "empty"
+            reason = "No offerings data"
+    else:
+        for field in fields:
+            val = data.get(field) if isinstance(data, dict) else None
+            if val and val != [] and val != {} and val != "":
+                filled.append(field)
+            else:
+                missing.append(field)
+
+        if fields:
+            score = int(len(filled) / len(fields) * 100)
+        else:
+            score = 100 if data else 0
+
+        if score == 100:
+            status = "complete"
+            reason = "All fields filled"
+        elif score >= 50:
+            status = "partial"
+            reason = f"{len(filled)}/{len(fields)} fields filled"
+        elif score > 0:
+            status = "sparse"
+            reason = f"Only {len(filled)}/{len(fields)} fields filled"
+        else:
+            status = "empty"
+            reason = "No meaningful data extracted"
+
+    return {
+        "score": score,
+        "filled": filled,
+        "missing": missing,
+        "status": status,
+        "reason": reason,
+    }
+
+
+@app.get("/api/brands/{brand_id}/diagnosis")
+def get_brand_diagnosis(brand_id: str, db: Session = Depends(get_db)):
+    brand = db.query(Brand).filter(Brand.id == brand_id).first()
+    if not brand:
+        raise HTTPException(status_code=404, detail="Brand not found")
+
+    json_path = os.path.join(DATA_DIR, f"{brand_id}.json")
+    hashes_path = os.path.join(DATA_DIR, f"{brand_id}_hashes.json")
+
+    crawl_info = {}
+    if os.path.exists(json_path):
+        with open(json_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        crawl_info["data_file_exists"] = True
+        crawl_info["generated_at"] = data.get("generated_at")
+        crawl_info["schema_version"] = data.get("schema_version")
+    else:
+        crawl_info["data_file_exists"] = False
+
+    if os.path.exists(hashes_path):
+        with open(hashes_path, "r", encoding="utf-8") as f:
+            hashes_data = json.load(f)
+        crawl_info["last_crawled"] = hashes_data.get("timestamp")
+
+    dimensions = [
+        "identity",
+        "offerings",
+        "differentiation",
+        "trust",
+        "experience",
+        "access",
+        "content",
+        "perception",
+        "decision_factors",
+        "vitality",
+        "campaigns",
+    ]
+    dim_results = {}
+    total_score = 0
+
+    if crawl_info["data_file_exists"]:
+        with open(json_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        for dim in dimensions:
+            dim_data = data.get(dim)
+            eval_result = _evaluate_dimension(dim, dim_data)
+            dim_results[dim] = eval_result
+            total_score += eval_result["score"]
+        overall_score = int(total_score / len(dimensions))
+    else:
+        for dim in dimensions:
+            dim_results[dim] = {
+                "score": 0,
+                "filled": [],
+                "missing": DIMENSION_FIELD_MAP.get(dim, []),
+                "status": "missing",
+                "reason": "No data file found",
+            }
+        overall_score = 0
+
+    return {
+        "brand_id": brand_id,
+        "brand_name": brand.name,
+        "url": brand.url,
+        "status": brand.status,
+        "overall_score": overall_score,
+        "dimensions": dim_results,
+        "crawl_info": crawl_info,
+    }
+
+
 # --- MCP Endpoint ---
 
 

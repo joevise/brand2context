@@ -518,8 +518,18 @@ function IdentityCard({ data, editMode, onUpdate }: { data: any; editMode: boole
 
 function OfferingsGrid({ data, editMode, onUpdate }: { data: any[]; editMode: boolean; onUpdate: (section: string, data: any) => void }) {
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
-  if (!data?.length && !editMode) return null;
   const items = data || [];
+  if (!items.length && !editMode) {
+    return (
+      <Section title="产品服务 (0)" icon={Package} editMode={editMode}>
+        <div className="text-center py-8 text-[var(--muted-foreground)]">
+          <Package className="w-12 h-12 mx-auto mb-3 opacity-30" />
+          <p>暂无数据</p>
+          {editMode && <p className="text-xs mt-1">点击编辑按钮添加内容</p>}
+        </div>
+      </Section>
+    );
+  }
 
   const handleSave = (values: Record<string, any>[]) => {
     // Convert key_features back from comma-separated string to array
@@ -575,9 +585,20 @@ function OfferingsGrid({ data, editMode, onUpdate }: { data: any[]; editMode: bo
 }
 
 function DifferentiationSection({ data, editMode, onUpdate }: { data: any; editMode: boolean; onUpdate: (section: string, data: any) => void }) {
-  if (!data) return null;
   const [editField, setEditField] = useState<string | null>(null);
   const [editObjArr, setEditObjArr] = useState<string | null>(null);
+
+  if (!data || Object.keys(data).length === 0) {
+    return (
+      <Section title="差异化优势" icon={Sparkles} editMode={editMode}>
+        <div className="text-center py-8 text-[var(--muted-foreground)]">
+          <Sparkles className="w-12 h-12 mx-auto mb-3 opacity-30" />
+          <p>暂无数据</p>
+          {editMode && <p className="text-xs mt-1">点击编辑按钮添加内容</p>}
+        </div>
+      </Section>
+    );
+  }
 
   return (
     <Section title="差异化优势" icon={Sparkles} editMode={editMode} onEdit={() => setEditField("unique_selling_points")}>
@@ -620,9 +641,20 @@ function DifferentiationSection({ data, editMode, onUpdate }: { data: any; editM
 }
 
 function TrustSection({ data, editMode, onUpdate }: { data: any; editMode: boolean; onUpdate: (section: string, data: any) => void }) {
-  if (!data) return null;
   const [editField, setEditField] = useState<string | null>(null);
   const [editObjArr, setEditObjArr] = useState<string | null>(null);
+
+  if (!data || Object.keys(data).length === 0) {
+    return (
+      <Section title="信任背书" icon={Shield} editMode={editMode}>
+        <div className="text-center py-8 text-[var(--muted-foreground)]">
+          <Shield className="w-12 h-12 mx-auto mb-3 opacity-30" />
+          <p>暂无数据</p>
+          {editMode && <p className="text-xs mt-1">点击编辑按钮添加内容</p>}
+        </div>
+      </Section>
+    );
+  }
 
   return (
     <Section title="信任背书" icon={Shield} editMode={editMode} onEdit={() => setEditField("certifications")}>
@@ -649,9 +681,20 @@ function TrustSection({ data, editMode, onUpdate }: { data: any; editMode: boole
 }
 
 function ExperienceSection({ data, editMode, onUpdate }: { data: any; editMode: boolean; onUpdate: (section: string, data: any) => void }) {
-  if (!data) return null;
   const [editing, setEditing] = useState<string | null>(null);
   const [editObjArr, setEditObjArr] = useState<string | null>(null);
+
+  if (!data || Object.keys(data).length === 0) {
+    return (
+      <Section title="用户体验" icon={MessageCircle} editMode={editMode}>
+        <div className="text-center py-8 text-[var(--muted-foreground)]">
+          <MessageCircle className="w-12 h-12 mx-auto mb-3 opacity-30" />
+          <p>暂无数据</p>
+          {editMode && <p className="text-xs mt-1">点击编辑按钮添加内容</p>}
+        </div>
+      </Section>
+    );
+  }
 
   return (
     <Section title="用户体验" icon={MessageCircle} editMode={editMode} onEdit={() => setEditing("warranty")}>
@@ -714,10 +757,20 @@ function AccessSection({ data, editMode, onUpdate }: { data: any; editMode: bool
 }
 
 function ContentSection({ data, editMode, onUpdate }: { data: any; editMode: boolean; onUpdate: (section: string, data: any) => void }) {
-  if (!data) return null;
   const [editObjArr, setEditObjArr] = useState<string | null>(null);
-  const news = [...(data.latest_news || []), ...(data.key_announcements || [])];
-  if (news.length === 0 && !data.blog_posts?.length && !editMode) return null;
+  const news = [...(data?.latest_news || []), ...(data?.key_announcements || [])];
+
+  if (!data || (news.length === 0 && !data?.blog_posts?.length)) {
+    return (
+      <Section title="内容资产" icon={Newspaper} editMode={editMode}>
+        <div className="text-center py-8 text-[var(--muted-foreground)]">
+          <Newspaper className="w-12 h-12 mx-auto mb-3 opacity-30" />
+          <p>暂无数据</p>
+          {editMode && <p className="text-xs mt-1">点击编辑按钮添加内容</p>}
+        </div>
+      </Section>
+    );
+  }
 
   return (
     <Section title="内容资产" icon={Newspaper} editMode={editMode} onEdit={() => setEditObjArr("latest_news")}>
@@ -750,10 +803,21 @@ function ContentSection({ data, editMode, onUpdate }: { data: any; editMode: boo
 }
 
 function PerceptionSection({ data, editMode, onUpdate }: { data: any; editMode: boolean; onUpdate: (section: string, data: any) => void }) {
-  if (!data) return null;
   const [editing, setEditing] = useState<string | null>(null);
   const [editArr, setEditArr] = useState<string | null>(null);
   const [editObj, setEditObj] = useState<string | null>(null);
+
+  if (!data || Object.keys(data).length === 0) {
+    return (
+      <Section title="品牌感知" icon={Eye} editMode={editMode}>
+        <div className="text-center py-8 text-[var(--muted-foreground)]">
+          <Eye className="w-12 h-12 mx-auto mb-3 opacity-30" />
+          <p>暂无数据</p>
+          {editMode && <p className="text-xs mt-1">点击编辑按钮添加内容</p>}
+        </div>
+      </Section>
+    );
+  }
 
   return (
     <Section title="品牌感知" icon={Eye} editMode={editMode} onEdit={() => setEditArr("personality_traits")}>
@@ -789,9 +853,20 @@ function PerceptionSection({ data, editMode, onUpdate }: { data: any; editMode: 
 }
 
 function DecisionSection({ data, editMode, onUpdate }: { data: any; editMode: boolean; onUpdate: (section: string, data: any) => void }) {
-  if (!data) return null;
   const [editing, setEditing] = useState<string | null>(null);
   const [editObjArr, setEditObjArr] = useState<string | null>(null);
+
+  if (!data || Object.keys(data).length === 0) {
+    return (
+      <Section title="决策因子" icon={BarChart3} editMode={editMode}>
+        <div className="text-center py-8 text-[var(--muted-foreground)]">
+          <BarChart3 className="w-12 h-12 mx-auto mb-3 opacity-30" />
+          <p>暂无数据</p>
+          {editMode && <p className="text-xs mt-1">点击编辑按钮添加内容</p>}
+        </div>
+      </Section>
+    );
+  }
 
   return (
     <Section title="决策因子" icon={BarChart3} editMode={editMode} onEdit={() => setEditObjArr("category_key_factors")}>
@@ -836,9 +911,20 @@ function DecisionSection({ data, editMode, onUpdate }: { data: any; editMode: bo
 }
 
 function VitalitySection({ data, editMode, onUpdate }: { data: any; editMode: boolean; onUpdate: (section: string, data: any) => void }) {
-  if (!data) return null;
   const [editing, setEditing] = useState<string | null>(null);
   const fields = ["content_frequency", "last_product_launch", "last_campaign", "growth_signal", "community_size", "nps_or_satisfaction", "market_position", "industry_role"];
+
+  if (!data || Object.keys(data).length === 0) {
+    return (
+      <Section title="品牌活力" icon={Activity} editMode={editMode}>
+        <div className="text-center py-8 text-[var(--muted-foreground)]">
+          <Activity className="w-12 h-12 mx-auto mb-3 opacity-30" />
+          <p>暂无数据</p>
+          {editMode && <p className="text-xs mt-1">点击编辑按钮添加内容</p>}
+        </div>
+      </Section>
+    );
+  }
 
   return (
     <Section title="品牌活力" icon={Activity} editMode={editMode} onEdit={() => setEditing(fields[0])}>
@@ -855,11 +941,22 @@ function VitalitySection({ data, editMode, onUpdate }: { data: any; editMode: bo
 }
 
 function CampaignsSection({ data, editMode, onUpdate }: { data: any; editMode: boolean; onUpdate: (section: string, data: any) => void }) {
-  if (!data) return null;
-  const ongoing = data.ongoing || [];
-  const recent = data.recent || [];
-  const upcoming = data.upcoming || [];
-  const annual = data.annual_events || [];
+  const ongoing = data?.ongoing || [];
+  const recent = data?.recent || [];
+  const upcoming = data?.upcoming || [];
+  const annual = data?.annual_events || [];
+
+  if (!data || (ongoing.length === 0 && recent.length === 0 && upcoming.length === 0 && annual.length === 0)) {
+    return (
+      <Section title="品牌活动" icon={Calendar} editMode={editMode}>
+        <div className="text-center py-8 text-[var(--muted-foreground)]">
+          <Calendar className="w-12 h-12 mx-auto mb-3 opacity-30" />
+          <p>暂无数据</p>
+          {editMode && <p className="text-xs mt-1">点击编辑按钮添加内容</p>}
+        </div>
+      </Section>
+    );
+  }
 
   return (
     <Section title="品牌活动" icon={Calendar} editMode={editMode} onEdit={() => {}}>

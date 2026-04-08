@@ -158,6 +158,8 @@ def _extract_dimension(
 4. Output ONLY valid JSON matching the schema above
 5. If insufficient data, output an empty object or minimal valid structure
 6. 每条新闻、活动、公告等信息必须包含 source_url 字段（从上下文中提取原始 URL）。如果找不到 URL，填 null。
+7. CRITICAL: Never fabricate data. If the context does not contain information for a field, leave it empty (empty string or empty array). It is better to have missing data than false data.
+8. Only use information explicitly present in the context. If inferred or uncertain, prefix the value with [推断].
 
 ## BRAND CLUES:
 {clues_text}
@@ -310,7 +312,9 @@ Based on ALL the information provided below, generate a complete JSON object tha
 10. For "vitality", assess how active/growing the brand appears
 11. For "campaigns", fill ongoing (current campaigns), recent (past campaigns with impact), upcoming (announced future campaigns), and annual_events (recurring brand events). Look for product launches, promotions, collaborations, exhibitions, charity events, brand experiences.
 12. For arrays of objects, include at least the required fields
-13. Output ONLY valid JSON, no commentary
+13. CRITICAL: Never fabricate data. If the context does not contain information for a field, leave it empty (empty string or empty array). It is better to have missing data than false data.
+14. Only use information explicitly present in the context. If inferred or uncertain, prefix the value with [推断].
+15. Output ONLY valid JSON, no commentary
 
 ## EXTRACTED CLUES:
 {clues_text}

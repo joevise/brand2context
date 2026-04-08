@@ -17,13 +17,16 @@ os.makedirs(DATA_DIR, exist_ok=True)
 
 
 def _fetch_logo(url: str) -> str:
+    from urllib.parse import urljoin
+    import httpx
+    import subprocess
+    import tempfile
+
     logo_url = None
     try:
         domain = urlparse(url).netloc
         if domain.startswith("www."):
             domain = domain[4:]
-
-        import httpx
 
         debounce_url = f"https://logo.debounce.com/{domain}"
         try:
@@ -36,8 +39,44 @@ def _fetch_logo(url: str) -> str:
 
         if not logo_url:
             try:
-                resp = httpx.get(url, timeout=10.0, follow_redirects=True)
+                resp = httpx.get(
+                    url,
+                    timeout=15.0,
+                    follow_redirects=True,
+                    headers={
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                    },
+                )
                 html = resp.text
+
+                if len(html) < 500:
+                    try:
+                        playwright_script = """
+const { chromium } = require('playwright');
+(async () => {
+  const browser = await chromium.launch();
+  const page = await browser.newPage();
+  await page.goto(arguments[0], { waitUntil: 'networkidle', timeout: 15000 });
+  console.log(await page.content());
+  await browser.close();
+})();
+"""
+                        with tempfile.NamedTemporaryFile(
+                            mode="w", suffix=".js", delete=False
+                        ) as f:
+                            f.write(playwright_script)
+                            temp_file = f.name
+                        result = subprocess.run(
+                            ["node", temp_file, url],
+                            capture_output=True,
+                            text=True,
+                            timeout=30,
+                        )
+                        if result.stdout:
+                            html = result.stdout
+                        os.unlink(temp_file)
+                    except Exception:
+                        pass
 
                 og_image = re.search(
                     r'<meta[^>]*property=["\']og:image["\'][^>]*content=["\']([^"\']+)["\']',
@@ -46,6 +85,37 @@ def _fetch_logo(url: str) -> str:
                 )
                 if og_image:
                     logo_url = og_image.group(1)
+
+                if not logo_url:
+                    img_logo = re.search(
+                        r'<img[^>]*(?:class|id|alt|src)=["\'][^"\']*(?:logo|brand)[^"\']*["\'][^>]*src=["\']([^"\']+)["\']',
+                        html,
+                        re.I,
+                    )
+                    if img_logo:
+                        logo_url = img_logo.group(1)
+
+                if not logo_url:
+                    img_src_logo = re.search(
+                        r'<img[^>]*src=["\']([^"\']*(?:logo|brand)[^"\']*)["\']',
+                        html,
+                        re.I,
+                    )
+                    if img_src_logo:
+                        logo_url = img_src_logo.group(1)
+
+                if not logo_url:
+                    apple_icon = re.search(
+                        r'<link[^>]*rel=["\']apple-touch-icon["\'][^>]*href=["\']([^"\']+)["\']',
+                        html,
+                        re.I,
+                    )
+                    if apple_icon:
+                        logo_url = apple_icon.group(1)
+
+                if logo_url and not logo_url.startswith(("http://", "https://")):
+                    logo_url = urljoin(url, logo_url)
+
             except Exception:
                 pass
 
