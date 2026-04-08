@@ -119,6 +119,17 @@ def _select_context_for_dimension(
             )
 
     combined = "\n".join(context_parts)
+    if len(combined) < 500:
+        for sr in search_results:
+            sr_text = f"\n--- Search: {sr['query']} ---\n"
+            if sr.get("answer"):
+                sr_text += f"Answer: {sr['answer']}\n"
+            for r in sr.get("results", [])[:5]:
+                sr_text += f"• {r['title']} ({r['url']}): {r['content'][:300]}\n"
+            if sr_text not in combined:
+                context_parts.append(sr_text)
+        combined = "\n".join(context_parts)
+
     if len(combined) > 8000:
         combined = combined[:8000] + "\n[...truncated...]"
     return combined
@@ -142,10 +153,11 @@ def _extract_dimension(
 
 ## RULES:
 1. Fill in as many fields as possible from the provided context
-2. "schema_version" MUST be "0.3.0"
+2. "schema_version" MUST be "0.4.0"
 3. For arrays, include at least the key fields
 4. Output ONLY valid JSON matching the schema above
 5. If insufficient data, output an empty object or minimal valid structure
+6. 每条新闻、活动、公告等信息必须包含 source_url 字段（从上下文中提取原始 URL）。如果找不到 URL，填 null。
 
 ## BRAND CLUES:
 {clues_text}
@@ -253,7 +265,7 @@ def structure_brand(
 
     if len(dimension_results) >= 9:
         final_result = {
-            "schema_version": "0.3.0",
+            "schema_version": "0.4.0",
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "source_urls": [url],
         }
@@ -287,7 +299,7 @@ Based on ALL the information provided below, generate a complete JSON object tha
 
 ## RULES:
 1. Fill EVERY field you can from the provided data. Leave out fields only if truly no data exists.
-2. "schema_version" MUST be "0.3.0"
+2. "schema_version" MUST be "0.4.0"
 3. "generated_at" should be "{datetime.now(timezone.utc).isoformat()}"
 4. "source_urls" should include "{url}"
 5. "identity" and "offerings" are REQUIRED - always fill them
@@ -321,7 +333,7 @@ Generate the complete brand knowledge JSON now:"""
             system="You are a brand intelligence analyst. Output ONLY valid JSON matching the schema. Be thorough and precise. 请用中文填写所有字段内容。品牌名称、专有名词可保留英文原文。",
             max_tokens=16000,
         )
-        result["schema_version"] = "0.3.0"
+        result["schema_version"] = "0.4.0"
         result["generated_at"] = datetime.now(timezone.utc).isoformat()
         if "source_urls" not in result:
             result["source_urls"] = [url]
@@ -338,7 +350,7 @@ Generate the complete brand knowledge JSON now:"""
 
 Use this simplified structure:
 {{
-  "schema_version": "0.3.0",
+  "schema_version": "0.4.0",
   "generated_at": "{datetime.now(timezone.utc).isoformat()}",
   "source_urls": ["{url}"],
   "identity": {{"name": "", "tagline": "", "positioning": "", "category": "", "founded": "", "headquarters": ""}},
@@ -364,7 +376,7 @@ Fill in as much as possible. Output ONLY valid JSON."""
                 system="Output ONLY valid JSON. No explanation.",
                 max_tokens=8000,
             )
-            result["schema_version"] = "0.3.0"
+            result["schema_version"] = "0.4.0"
             result["generated_at"] = datetime.now(timezone.utc).isoformat()
             result.setdefault("source_urls", [url])
             print("   ✅ Fallback succeeded")
@@ -507,7 +519,7 @@ def structure_brand_incremental(
                 print(f"   ⚠️  {dim} extraction error: {e}, preserving previous")
 
     final_result = {
-        "schema_version": "0.3.0",
+        "schema_version": "0.4.0",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "source_urls": list(set(previous_result.get("source_urls", []) + [url])),
     }

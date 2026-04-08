@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Brand2Context Brand Knowledge Schema",
   "description": "Structured brand knowledge for AI consumption, covering the full consumer decision journey.",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "type": "object",
   "required": [
     "schema_version",
@@ -195,6 +195,10 @@
               },
               "issuer": {
                 "type": "string"
+              },
+              "source_url": {
+                "type": "string",
+                "format": "uri"
               }
             }
           }
@@ -270,6 +274,10 @@
               },
               "verified": {
                 "type": "boolean"
+              },
+              "source_url": {
+                "type": "string",
+                "format": "uri"
               }
             }
           }
@@ -407,6 +415,10 @@
               "url": {
                 "type": "string",
                 "format": "uri"
+              },
+              "source_url": {
+                "type": "string",
+                "format": "uri"
               }
             }
           }
@@ -445,6 +457,10 @@
               },
               "content": {
                 "type": "string"
+              },
+              "source_url": {
+                "type": "string",
+                "format": "uri"
               }
             }
           }
@@ -618,6 +634,10 @@
                 "type": "string",
                 "format": "uri"
               },
+              "source_url": {
+                "type": "string",
+                "format": "uri"
+              },
               "highlights": {
                 "type": "array",
                 "items": {
@@ -646,6 +666,10 @@
               },
               "impact": {
                 "type": "string"
+              },
+              "source_url": {
+                "type": "string",
+                "format": "uri"
               }
             }
           }
