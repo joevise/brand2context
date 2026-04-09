@@ -327,6 +327,15 @@ export async function cancelAllTasks(): Promise<{ message: string; count: number
   return res.json();
 }
 
+export async function resetStuckTasks(): Promise<{ message: string; stuck_reset: number; queue_drained: number }> {
+  const res = await fetch(`${API_URL}/api/admin/batch/reset-stuck`, {
+    method: "POST",
+    headers: { ...getAuthHeaders() },
+  });
+  if (!res.ok) throw new Error("Failed to reset stuck tasks");
+  return res.json();
+}
+
 export async function getRefreshStatus(): Promise<{ total_brands: number; up_to_date: number; outdated: number; outdated_brands: { id: string; name: string; url: string; last_refreshed: string | null; days_since: number }[]; refresh_cycle_days: number }> {
   const res = await fetch(`${API_URL}/api/admin/refresh-status`, {
     cache: "no-store",

@@ -36,6 +36,7 @@ import {
   refreshBrand,
   cancelBrandTask,
   cancelAllTasks,
+  resetStuckTasks,
   Brand,
 } from "@/lib/api";
 import {
@@ -187,6 +188,7 @@ function TaskMonitorPanel({
   onCancelAll,
   onRetryFailed,
   onRefreshBrand,
+  onResetStuck,
 }: {
   batchStatus: BatchStatus | null;
   onPause: () => void;
@@ -195,6 +197,7 @@ function TaskMonitorPanel({
   onCancelAll: () => void;
   onRetryFailed: () => void;
   onRefreshBrand: (brandId: string) => void;
+  onResetStuck: () => void;
 }) {
   const [expandedFailed, setExpandedFailed] = useState<Set<string>>(new Set());
   const [showCompleted, setShowCompleted] = useState(false);
@@ -303,6 +306,13 @@ function TaskMonitorPanel({
                 <RotateCcw className="w-3 h-3" /> 重试失败 ({failed})
               </button>
             )}
+            <button
+              onClick={onResetStuck}
+              className="px-3 py-1.5 rounded-lg bg-gray-600/20 text-gray-400 border border-gray-600/30 text-xs font-medium hover:bg-gray-600/30 transition flex items-center gap-1"
+              title="重置所有卡住的任务（processing/pending → error），清空队列"
+            >
+              <Ban className="w-3 h-3" /> 重置卡住
+            </button>
           </div>
         </div>
         <div className="w-full bg-gray-700 rounded-full h-2.5">
@@ -1864,6 +1874,7 @@ export default function AdminPage() {
                 onCancelAll={async () => { await cancelAllTasks(); fetchBatchStatus(); }}
                 onRetryFailed={async () => { await retryFailedBatch(); fetchBatchStatus(); }}
                 onRefreshBrand={async (brandId) => { await refreshBrand(brandId); fetchBatchStatus(); }}
+                onResetStuck={async () => { await resetStuckTasks(); fetchBatchStatus(); }}
               />
             )}
           </div>

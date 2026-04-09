@@ -617,6 +617,41 @@ def cancel_all_tasks(current_user: User = Depends(get_current_admin_user)):
     return {"message": f"Cancelled {count} queued tasks", "count": count}
 
 
+@admin_router.post("/batch/reset-stuck")
+def reset_stuck_tasks(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """Reset all stuck processing/pending brands to error, and clear the batch queue."""
+    stuck = db.query(Brand).filter(Brand.status.in_(["processing", "pending"])).all()
+    for b in stuck:
+        b.status = "error"
+        b.progress_step = "error"
+        b.error_message = "Manual reset: cleared stuck task"
+        b.updated_at = datetime.now(timezone.utc)
+    db.commit()
+
+    # Also drain the in-memory queue
+    drained = 0
+    while not batch_queue.q.empty():
+        try:
+            batch_queue.q.get_nowait()
+            drained += 1
+        except queue.Empty:
+            break
+
+    # Reset batch queue state
+    with batch_queue._lock:
+        batch_queue.running.clear()
+    batch_queue.total = 0
+
+    return {
+        "message": f"Reset {len(stuck)} stuck brands and drained {drained} queued items",
+        "stuck_reset": len(stuck),
+        "queue_drained": drained,
+    }
+
+
 class RetryDBRequest(BaseModel):
     batch_size: int = 10
 

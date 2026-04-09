@@ -27,6 +27,24 @@ from admin import admin_router
 
 JWT_SECRET = os.getenv("JWT_SECRET", "brand2context-dev-secret")
 
+
+def _recover_stuck_brands():
+    """On startup, reset any brands stuck in processing/pending (from previous container lifecycle)."""
+    try:
+        db = SessionLocal()
+        stuck = db.query(Brand).filter(Brand.status.in_(["processing", "pending"])).all()
+        if stuck:
+            for b in stuck:
+                b.status = "error"
+                b.progress_step = "error"
+                b.error_message = "Auto-reset: task was interrupted by server restart"
+                b.updated_at = datetime.now(timezone.utc)
+            db.commit()
+            print(f"🔄 Startup recovery: reset {len(stuck)} stuck brands to error status")
+        db.close()
+    except Exception as e:
+        print(f"⚠️ Startup recovery failed: {e}")
+
 MINIMAX_API_KEY = os.getenv(
     "MINIMAX_API_KEY",
     "sk-cp-49r5TFMzeb7-z-HCbtIPK3h7NZPVs8QJIPVIBC9S3JDjeHq4pKU6YZ-srAyN1YH3-LR6wS0ot4f6xEcqR34SsBpE-yPuW-9kb_yGlDRaive4lhwduA3UAZs",
@@ -53,6 +71,8 @@ os.makedirs(DATA_DIR, exist_ok=True)
 def startup():
     os.makedirs("data", exist_ok=True)
     init_db()
+    # Auto-recover stuck brands after container restart
+    _recover_stuck_brands()
 
 
 # --- Pydantic schemas ---
