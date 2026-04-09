@@ -402,12 +402,25 @@ class BatchQueue:
                 if not url.startswith("http"):
                     url = "https://" + url
 
-                brand_id = str(uuid.uuid4())
-                db = SessionLocal()
-                brand = Brand(id=brand_id, url=url, status="pending", category=category)
-                db.add(brand)
-                db.commit()
-                db.close()
+                # Reuse existing brand_id if provided (e.g. from refresh/retry)
+                brand_id = item.get("brand_id")
+                if brand_id:
+                    db = SessionLocal()
+                    brand = db.query(Brand).filter(Brand.id == brand_id).first()
+                    if brand:
+                        brand.status = "processing"
+                        brand.progress_step = "crawling"
+                        brand.error_message = None
+                        brand.updated_at = datetime.now(timezone.utc)
+                        db.commit()
+                    db.close()
+                else:
+                    brand_id = str(uuid.uuid4())
+                    db = SessionLocal()
+                    brand = Brand(id=brand_id, url=url, status="pending", category=category)
+                    db.add(brand)
+                    db.commit()
+                    db.close()
 
                 t = threading.Thread(
                     target=run_brand_pipeline, args=(brand_id, url), daemon=True
@@ -462,6 +475,12 @@ class BatchQueue:
                 break
         self.total -= cancelled_count
         return cancelled_count
+
+    def ensure_worker(self):
+        """Make sure a worker thread is running to consume the queue."""
+        if self._worker_thread is None or not self._worker_thread.is_alive():
+            self._worker_thread = threading.Thread(target=self._worker, daemon=True)
+            self._worker_thread.start()
 
     def status(self):
         with self._lock:
@@ -1470,6 +1489,8 @@ def batch_refresh_brands(
                 }
             )
             count += 1
+    batch_queue.total += count
+    batch_queue.ensure_worker()
     return {"message": f"Queued {count} brands for refresh", "count": count}
 
 
@@ -1496,4 +1517,6 @@ def refresh_single_brand(
             "brand_id": brand.id,
         }
     )
+    batch_queue.total += 1
+    batch_queue.ensure_worker()
     return {"message": "Queued for refresh"}
