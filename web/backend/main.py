@@ -24,6 +24,7 @@ from models import init_db, get_db, Brand, ApiCallLog, User, SessionLocal
 from tasks import run_brand_pipeline
 from mcp_server import handle_mcp_request
 from admin import admin_router
+from autocrawl import autocrawl_router
 
 JWT_SECRET = os.getenv("JWT_SECRET", "brand2context-dev-secret")
 
@@ -62,6 +63,7 @@ app.add_middleware(
 )
 
 app.include_router(admin_router)
+app.include_router(autocrawl_router)
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data", "brands")
 os.makedirs(DATA_DIR, exist_ok=True)

@@ -37,6 +37,15 @@ import {
   cancelBrandTask,
   cancelAllTasks,
   resetStuckTasks,
+  getAutoCrawlStatus,
+  startAutoCrawl,
+  stopAutoCrawl,
+  pauseAutoCrawl,
+  resumeAutoCrawl,
+  updateAutoCrawlConfig,
+  resetAutoCrawl,
+  skipAutoCrawlIndustry,
+  AutoCrawlStatus,
   Brand,
 } from "@/lib/api";
 import {
@@ -71,6 +80,10 @@ import {
   Ban,
   ChevronDown,
   ChevronUp,
+  Zap,
+  SkipForward,
+  Terminal,
+  Power,
 } from "lucide-react";
 
 const STATUS_COLORS = {
@@ -114,6 +127,234 @@ function Modal({
           </button>
         </div>
         {children}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// AutoCrawl Panel
+// ============================================================
+
+function AutoCrawlPanel() {
+  const [status, setStatus] = useState<AutoCrawlStatus | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [showLog, setShowLog] = useState(false);
+  const [editConfig, setEditConfig] = useState(false);
+  const [configDraft, setConfigDraft] = useState({ daily_limit: 50, brands_per_industry: 30, pause_between_brands_sec: 10 });
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const fetchStatus = useCallback(async () => {
+    try {
+      const s = await getAutoCrawlStatus();
+      setStatus(s);
+      setConfigDraft({
+        daily_limit: s.config.daily_limit,
+        brands_per_industry: s.config.brands_per_industry,
+        pause_between_brands_sec: s.config.pause_between_brands_sec,
+      });
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    fetchStatus();
+    pollingRef.current = setInterval(fetchStatus, status?.running ? 5000 : 15000);
+    return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
+  }, [fetchStatus, status?.running]);
+
+  const handleStart = async () => { setLoading(true); await startAutoCrawl(); await fetchStatus(); setLoading(false); };
+  const handleStop = async () => { setLoading(true); await stopAutoCrawl(); await fetchStatus(); setLoading(false); };
+  const handlePause = async () => { await pauseAutoCrawl(); await fetchStatus(); };
+  const handleResume = async () => { await resumeAutoCrawl(); await fetchStatus(); };
+  const handleSkip = async () => { await skipAutoCrawlIndustry(); await fetchStatus(); };
+  const handleReset = async () => { if (confirm("确定重置所有自动扩张进度？")) { await resetAutoCrawl(); await fetchStatus(); } };
+  const handleSaveConfig = async () => {
+    await updateAutoCrawlConfig(configDraft);
+    setEditConfig(false);
+    await fetchStatus();
+  };
+
+  if (!status) {
+    return <div className="text-center py-16 text-gray-500"><Loader2 className="w-8 h-8 mx-auto animate-spin mb-2" />加载中...</div>;
+  }
+
+  const industries = status.config.industries || [];
+  const progressPct = status.total_industries > 0
+    ? Math.round((status.industries_completed.length / status.total_industries) * 100) : 0;
+
+  return (
+    <div className="space-y-6">
+      {/* Main Control */}
+      <div className="bg-gray-800/40 rounded-xl p-6 border border-gray-700">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className={`w-3 h-3 rounded-full ${status.running && !status.paused ? "bg-green-400 animate-pulse" : status.paused ? "bg-yellow-400" : "bg-gray-500"}`} />
+            <h3 className="text-lg font-semibold">
+              {status.running && !status.paused ? "运行中" : status.paused ? "已暂停" : "已停止"}
+            </h3>
+            {status.current_industry && (
+              <span className="px-2 py-0.5 text-xs rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                {status.current_industry}
+              </span>
+            )}
+            {status.current_brand && (
+              <span className="text-sm text-gray-400">→ {status.current_brand}</span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {!status.running ? (
+              <button onClick={handleStart} disabled={loading}
+                className="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-medium text-sm transition flex items-center gap-2 disabled:opacity-50">
+                <Power className="w-4 h-4" /> 一键启动
+              </button>
+            ) : (
+              <>
+                {!status.paused ? (
+                  <button onClick={handlePause} className="px-3 py-1.5 rounded-lg bg-yellow-600/20 text-yellow-400 border border-yellow-600/30 text-xs font-medium hover:bg-yellow-600/30 transition flex items-center gap-1">
+                    <Pause className="w-3 h-3" /> 暂停
+                  </button>
+                ) : (
+                  <button onClick={handleResume} className="px-3 py-1.5 rounded-lg bg-green-600/20 text-green-400 border border-green-600/30 text-xs font-medium hover:bg-green-600/30 transition flex items-center gap-1">
+                    <Play className="w-3 h-3" /> 继续
+                  </button>
+                )}
+                <button onClick={handleSkip} className="px-3 py-1.5 rounded-lg bg-blue-600/20 text-blue-400 border border-blue-600/30 text-xs font-medium hover:bg-blue-600/30 transition flex items-center gap-1">
+                  <SkipForward className="w-3 h-3" /> 跳过行业
+                </button>
+                <button onClick={handleStop} className="px-3 py-1.5 rounded-lg bg-red-600/20 text-red-400 border border-red-600/30 text-xs font-medium hover:bg-red-600/30 transition flex items-center gap-1">
+                  <Square className="w-3 h-3" /> 停止
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+          <div className="bg-gray-900/50 rounded-lg p-3 text-center">
+            <div className="text-2xl font-bold text-green-400">{status.total_crawled}</div>
+            <div className="text-xs text-gray-500">已爬取</div>
+          </div>
+          <div className="bg-gray-900/50 rounded-lg p-3 text-center">
+            <div className="text-2xl font-bold text-gray-400">{status.total_skipped}</div>
+            <div className="text-xs text-gray-500">已跳过</div>
+          </div>
+          <div className="bg-gray-900/50 rounded-lg p-3 text-center">
+            <div className="text-2xl font-bold text-red-400">{status.total_failed}</div>
+            <div className="text-xs text-gray-500">失败</div>
+          </div>
+          <div className="bg-gray-900/50 rounded-lg p-3 text-center">
+            <div className="text-2xl font-bold text-blue-400">{status.today_count}/{status.daily_limit}</div>
+            <div className="text-xs text-gray-500">今日/上限</div>
+          </div>
+          <div className="bg-gray-900/50 rounded-lg p-3 text-center">
+            <div className="text-2xl font-bold text-purple-400">{status.industries_completed.length}/{status.total_industries}</div>
+            <div className="text-xs text-gray-500">行业完成</div>
+          </div>
+        </div>
+
+        {/* Overall Progress */}
+        <div className="w-full bg-gray-700 rounded-full h-2">
+          <div className="h-2 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-500" style={{ width: `${progressPct}%` }} />
+        </div>
+        <div className="text-xs text-gray-500 mt-1 text-right">{progressPct}% 行业完成</div>
+      </div>
+
+      {/* Config */}
+      <div className="bg-gray-800/40 rounded-xl p-4 border border-gray-700">
+        <div className="flex items-center justify-between mb-3">
+          <h4 className="text-sm font-medium flex items-center gap-2"><Settings className="w-4 h-4" /> 配置</h4>
+          <div className="flex items-center gap-2">
+            {editConfig ? (
+              <>
+                <button onClick={handleSaveConfig} className="px-3 py-1 rounded bg-green-600/20 text-green-400 text-xs hover:bg-green-600/30 transition">保存</button>
+                <button onClick={() => setEditConfig(false)} className="px-3 py-1 rounded bg-gray-600/20 text-gray-400 text-xs hover:bg-gray-600/30 transition">取消</button>
+              </>
+            ) : (
+              <button onClick={() => setEditConfig(true)} className="px-3 py-1 rounded bg-gray-600/20 text-gray-400 text-xs hover:bg-gray-600/30 transition">编辑</button>
+            )}
+            <button onClick={handleReset} className="px-3 py-1 rounded bg-red-600/10 text-red-400/60 text-xs hover:bg-red-600/20 transition">重置进度</button>
+          </div>
+        </div>
+        {editConfig ? (
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">每日上限</label>
+              <input type="number" value={configDraft.daily_limit} onChange={(e) => setConfigDraft({...configDraft, daily_limit: Number(e.target.value)})}
+                className="w-full px-3 py-2 rounded-lg bg-gray-900 border border-gray-600 text-sm" />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">每行业品牌数</label>
+              <input type="number" value={configDraft.brands_per_industry} onChange={(e) => setConfigDraft({...configDraft, brands_per_industry: Number(e.target.value)})}
+                className="w-full px-3 py-2 rounded-lg bg-gray-900 border border-gray-600 text-sm" />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">间隔(秒)</label>
+              <input type="number" value={configDraft.pause_between_brands_sec} onChange={(e) => setConfigDraft({...configDraft, pause_between_brands_sec: Number(e.target.value)})}
+                className="w-full px-3 py-2 rounded-lg bg-gray-900 border border-gray-600 text-sm" />
+            </div>
+          </div>
+        ) : (
+          <div className="flex gap-6 text-sm text-gray-400">
+            <span>每日上限: <strong className="text-gray-200">{status.config.daily_limit}</strong></span>
+            <span>每行业: <strong className="text-gray-200">{status.config.brands_per_industry}</strong> 品牌</span>
+            <span>间隔: <strong className="text-gray-200">{status.config.pause_between_brands_sec}s</strong></span>
+          </div>
+        )}
+      </div>
+
+      {/* Industry Progress */}
+      <div className="bg-gray-800/40 rounded-xl border border-gray-700 overflow-hidden">
+        <div className="px-4 py-3 bg-purple-500/10 border-b border-gray-700">
+          <span className="text-sm font-medium text-purple-400">行业进度 ({industries.length})</span>
+        </div>
+        <div className="divide-y divide-gray-700/50 max-h-80 overflow-y-auto">
+          {industries.map((ind, idx) => {
+            const prog = status.industry_progress[ind];
+            const isCompleted = status.industries_completed.includes(ind);
+            const isCurrent = status.current_industry === ind;
+            const total = prog?.total || 0;
+            const done = prog?.done || 0;
+            const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+            return (
+              <div key={ind} className={`px-4 py-2.5 flex items-center gap-3 ${isCurrent ? "bg-blue-500/5" : ""}`}>
+                <span className="text-xs text-gray-500 w-6">{idx + 1}</span>
+                <span className={`flex-1 text-sm ${isCurrent ? "text-blue-400 font-medium" : isCompleted ? "text-green-400" : "text-gray-400"}`}>
+                  {isCurrent && "▶ "}{ind}
+                </span>
+                {prog ? (
+                  <div className="flex items-center gap-2 w-48">
+                    <div className="flex-1 bg-gray-700 rounded-full h-1.5">
+                      <div className={`h-1.5 rounded-full transition-all ${isCompleted ? "bg-green-500" : "bg-blue-500"}`} style={{ width: `${pct}%` }} />
+                    </div>
+                    <span className="text-xs text-gray-500 w-20 text-right">{done}/{total} ({pct}%)</span>
+                  </div>
+                ) : (
+                  <span className="text-xs text-gray-600 w-48 text-right">等待中</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Activity Log */}
+      <div className="bg-gray-800/40 rounded-xl border border-gray-700 overflow-hidden">
+        <div className="px-4 py-3 bg-gray-500/10 border-b border-gray-700 flex items-center justify-between cursor-pointer hover:bg-gray-500/15 transition"
+          onClick={() => setShowLog(!showLog)}>
+          <span className="text-sm font-medium text-gray-400 flex items-center gap-2"><Terminal className="w-4 h-4" /> 运行日志</span>
+          {showLog ? <ChevronUp className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
+        </div>
+        {showLog && (
+          <div className="p-3 max-h-60 overflow-y-auto font-mono text-xs">
+            {status.recent_log.slice().reverse().map((entry, i) => (
+              <div key={i} className="py-0.5 text-gray-400">
+                <span className="text-gray-600">{new Date(entry.time).toLocaleTimeString()}</span> {entry.msg}
+              </div>
+            ))}
+            {status.recent_log.length === 0 && <div className="text-gray-600 text-center py-4">暂无日志</div>}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -647,7 +888,7 @@ function ManualAddModal({
 }
 
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState<"seeds" | "batch" | "refresh" | "industry" | "brands" | "tasks">("seeds");
+  const [activeTab, setActiveTab] = useState<"seeds" | "batch" | "refresh" | "industry" | "brands" | "tasks" | "autopilot">("seeds");
   const [dashboard, setDashboard] = useState<AdminDashboard | null>(null);
   const [seeds, setSeeds] = useState<Seed[]>([]);
   const [seedsTotal, setSeedsTotal] = useState(0);
@@ -771,6 +1012,8 @@ export default function AdminPage() {
       fetchBatchStatus();
       const interval = batchStatus?.processing ? 3000 : 10000;
       pollingRef.current = setInterval(fetchBatchStatus, interval);
+    } else if (activeTab === "autopilot") {
+      // AutoCrawl panel manages its own polling
     } else if (activeTab === "industry") {
       fetchIndustryStats();
       pollingRef.current = setInterval(fetchIndustryStats, 10000);
@@ -1173,6 +1416,17 @@ export default function AdminPage() {
                   {batchStatus.processing}
                 </span>
               )}
+            </button>
+            <button
+              onClick={() => setActiveTab("autopilot")}
+              className={`px-6 py-3 text-sm font-medium transition ${
+                activeTab === "autopilot"
+                  ? "text-primary-400 border-b-2 border-primary-400 bg-primary-950/20"
+                  : "text-gray-400 hover:text-gray-200"
+              }`}
+            >
+              <Zap className="w-4 h-4 inline mr-2" />
+              自动扩张
             </button>
           </div>
 
@@ -1876,6 +2130,10 @@ export default function AdminPage() {
                 onRefreshBrand={async (brandId) => { await refreshBrand(brandId); fetchBatchStatus(); }}
                 onResetStuck={async () => { await resetStuckTasks(); fetchBatchStatus(); }}
               />
+            )}
+
+            {activeTab === "autopilot" && (
+              <AutoCrawlPanel />
             )}
           </div>
         </div>

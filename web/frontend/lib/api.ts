@@ -538,3 +538,105 @@ export async function refreshBrand(brandId: string): Promise<{message: string}> 
   if (!res.ok) throw new Error("Failed to refresh brand");
   return res.json();
 }
+
+// ============================================================
+// AutoCrawl API
+// ============================================================
+
+export interface AutoCrawlIndustryProgress {
+  total: number;
+  done: number;
+  failed: number;
+  skipped: number;
+  current_idx: number;
+}
+
+export interface AutoCrawlStatus {
+  running: boolean;
+  paused: boolean;
+  current_industry: string | null;
+  current_industry_idx: number;
+  total_industries: number;
+  current_brand: string | null;
+  today_count: number;
+  daily_limit: number;
+  total_crawled: number;
+  total_skipped: number;
+  total_failed: number;
+  industries_completed: string[];
+  industry_progress: Record<string, AutoCrawlIndustryProgress>;
+  config: {
+    daily_limit: number;
+    concurrent: number;
+    brands_per_industry: number;
+    pause_between_brands_sec: number;
+    industries: string[];
+  };
+  recent_log: { time: string; msg: string }[];
+}
+
+export async function getAutoCrawlStatus(): Promise<AutoCrawlStatus> {
+  const res = await fetch(`${API_URL}/api/admin/autocrawl/status`, {
+    cache: "no-store",
+    headers: { ...getAuthHeaders() },
+  });
+  if (!res.ok) throw new Error("Failed to get autocrawl status");
+  return res.json();
+}
+
+export async function startAutoCrawl(): Promise<void> {
+  const res = await fetch(`${API_URL}/api/admin/autocrawl/start`, {
+    method: "POST",
+    headers: { ...getAuthHeaders() },
+  });
+  if (!res.ok) throw new Error("Failed to start autocrawl");
+}
+
+export async function stopAutoCrawl(): Promise<void> {
+  const res = await fetch(`${API_URL}/api/admin/autocrawl/stop`, {
+    method: "POST",
+    headers: { ...getAuthHeaders() },
+  });
+  if (!res.ok) throw new Error("Failed to stop autocrawl");
+}
+
+export async function pauseAutoCrawl(): Promise<void> {
+  const res = await fetch(`${API_URL}/api/admin/autocrawl/pause`, {
+    method: "POST",
+    headers: { ...getAuthHeaders() },
+  });
+  if (!res.ok) throw new Error("Failed to pause autocrawl");
+}
+
+export async function resumeAutoCrawl(): Promise<void> {
+  const res = await fetch(`${API_URL}/api/admin/autocrawl/resume`, {
+    method: "POST",
+    headers: { ...getAuthHeaders() },
+  });
+  if (!res.ok) throw new Error("Failed to resume autocrawl");
+}
+
+export async function updateAutoCrawlConfig(config: Partial<AutoCrawlStatus["config"]>): Promise<void> {
+  const res = await fetch(`${API_URL}/api/admin/autocrawl/config`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+    body: JSON.stringify(config),
+  });
+  if (!res.ok) throw new Error("Failed to update autocrawl config");
+}
+
+export async function resetAutoCrawl(): Promise<void> {
+  const res = await fetch(`${API_URL}/api/admin/autocrawl/reset`, {
+    method: "POST",
+    headers: { ...getAuthHeaders() },
+  });
+  if (!res.ok) throw new Error("Failed to reset autocrawl");
+}
+
+export async function skipAutoCrawlIndustry(): Promise<void> {
+  const res = await fetch(`${API_URL}/api/admin/autocrawl/skip-industry`, {
+    method: "POST",
+    headers: { ...getAuthHeaders() },
+  });
+  if (!res.ok) throw new Error("Failed to skip industry");
+}
