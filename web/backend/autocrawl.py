@@ -24,10 +24,10 @@ from sqlalchemy.orm import Session
 from models import SessionLocal, Brand, get_db
 from admin import get_current_admin_user, batch_queue
 
-MINIMAX_API_KEY = os.getenv(
-    "MINIMAX_API_KEY",
-    "sk-cp-49r5TFMzeb7-z-HCbtIPK3h7NZPVs8QJIPVIBC9S3JDjeHq4pKU6YZ-srAyN1YH3-LR6wS0ot4f6xEcqR34SsBpE-yPuW-9kb_yGlDRaive4lhwduA3UAZs",
-)
+# LLM config from brand2context config
+import sys as _sys
+_sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
+from brand2context.config import LLM_API_KEY, LLM_MODEL, LLM_ENDPOINT
 
 STATE_FILE = os.path.join(os.path.dirname(__file__), "data", "autocrawl_state.json")
 
@@ -127,13 +127,13 @@ class AutoCrawlEngine:
 
     def _llm_call(self, prompt: str, max_tokens: int = 4000) -> str:
         resp = httpx.post(
-            "https://api.minimax.chat/v1/text/chatcompletion_v2",
+            LLM_ENDPOINT,
             headers={
-                "Authorization": f"Bearer {MINIMAX_API_KEY}",
+                "Authorization": f"Bearer {LLM_API_KEY}",
                 "Content-Type": "application/json",
             },
             json={
-                "model": "MiniMax-M2.7",
+                "model": LLM_MODEL,
                 "messages": [{"role": "user", "content": prompt}],
                 "max_tokens": max_tokens,
                 "temperature": 0.2,

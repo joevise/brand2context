@@ -1,12 +1,19 @@
 import os
 
 LINK2CONTEXT_BASE = os.getenv("LINK2CONTEXT_URL", "http://67.209.190.54:8000")
-MINIMAX_API_KEY = os.getenv(
-    "MINIMAX_API_KEY",
-    "sk-cp-49r5TFMzeb7-z-HCbtIPK3h7NZPVs8QJIPVIBC9S3JDjeHq4pKU6YZ-srAyN1YH3-LR6wS0ot4f6xEcqR34SsBpE-yPuW-9kb_yGlDRaive4lhwduA3UAZs",
+
+# LLM Configuration — GLM-4-Flash (free, unlimited)
+LLM_API_KEY = os.getenv(
+    "LLM_API_KEY",
+    "63078dbeb7e0b19197c7a44e64b7228e.4IPyp2wgiLZMhKAb",
 )
-MINIMAX_MODEL = "MiniMax-M2.7"
-MINIMAX_ENDPOINT = "https://api.minimax.chat/v1/text/chatcompletion_v2"
+LLM_MODEL = os.getenv("LLM_MODEL", "glm-4-flash")
+LLM_ENDPOINT = os.getenv("LLM_ENDPOINT", "https://open.bigmodel.cn/api/paas/v4/chat/completions")
+
+# Legacy aliases (for backward compatibility with llm.py etc.)
+MINIMAX_API_KEY = LLM_API_KEY
+MINIMAX_MODEL = LLM_MODEL
+MINIMAX_ENDPOINT = LLM_ENDPOINT
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "")
 TAVILY_ENDPOINT = "https://api.tavily.com/search"
 METASO_API_KEY = os.getenv("METASO_API_KEY", "mk-DA5C2447D54689CD7757A0C4AB162CA3")

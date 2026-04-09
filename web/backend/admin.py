@@ -47,10 +47,10 @@ def get_current_admin_user(
 
 SEEDS_FILE = os.path.join(os.path.dirname(__file__), "seeds", "brands_seed.json")
 SETTINGS_FILE = os.path.join(os.path.dirname(__file__), "seeds", "settings.json")
-MINIMAX_API_KEY = os.getenv(
-    "MINIMAX_API_KEY",
-    "sk-cp-49r5TFMzeb7-z-HCbtIPK3h7NZPVs8QJIPVIBC9S3JDjeHq4pKU6YZ-srAyN1YH3-LR6wS0ot4f6xEcqR34SsBpE-yPuW-9kb_yGlDRaive4lhwduA3UAZs",
-)
+# LLM config
+import sys as _sys
+_sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
+from brand2context.config import LLM_API_KEY, LLM_MODEL, LLM_ENDPOINT
 
 # ============================================================
 # Settings
@@ -209,13 +209,13 @@ def ai_generate_seeds(
 
     try:
         resp = httpx.post(
-            "https://api.minimax.chat/v1/text/chatcompletion_v2",
+            LLM_ENDPOINT,
             headers={
-                "Authorization": f"Bearer {MINIMAX_API_KEY}",
+                "Authorization": f"Bearer {LLM_API_KEY}",
                 "Content-Type": "application/json",
             },
             json={
-                "model": "MiniMax-M2.7",
+                "model": LLM_MODEL,
                 "messages": [{"role": "user", "content": prompt}],
                 "max_tokens": 4000,
                 "temperature": 0.2,
@@ -264,13 +264,13 @@ def search_add_seed(
 
     try:
         resp = httpx.post(
-            "https://api.minimax.chat/v1/text/chatcompletion_v2",
+            LLM_ENDPOINT,
             headers={
-                "Authorization": f"Bearer {MINIMAX_API_KEY}",
+                "Authorization": f"Bearer {LLM_API_KEY}",
                 "Content-Type": "application/json",
             },
             json={
-                "model": "MiniMax-M2.7",
+                "model": LLM_MODEL,
                 "messages": [{"role": "user", "content": prompt}],
                 "max_tokens": 200,
                 "temperature": 0.1,
@@ -1013,13 +1013,13 @@ def launch_industry(
 
     try:
         resp = httpx.post(
-            "https://api.minimax.chat/v1/text/chatcompletion_v2",
+            LLM_ENDPOINT,
             headers={
-                "Authorization": f"Bearer {MINIMAX_API_KEY}",
+                "Authorization": f"Bearer {LLM_API_KEY}",
                 "Content-Type": "application/json",
             },
             json={
-                "model": "MiniMax-M2.7",
+                "model": LLM_MODEL,
                 "messages": [{"role": "user", "content": prompt}],
                 "max_tokens": 4000,
                 "temperature": 0.2,

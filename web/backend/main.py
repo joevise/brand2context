@@ -46,10 +46,7 @@ def _recover_stuck_brands():
     except Exception as e:
         print(f"⚠️ Startup recovery failed: {e}")
 
-MINIMAX_API_KEY = os.getenv(
-    "MINIMAX_API_KEY",
-    "sk-cp-49r5TFMzeb7-z-HCbtIPK3h7NZPVs8QJIPVIBC9S3JDjeHq4pKU6YZ-srAyN1YH3-LR6wS0ot4f6xEcqR34SsBpE-yPuW-9kb_yGlDRaive4lhwduA3UAZs",
-)
+from brand2context.config import LLM_API_KEY, LLM_MODEL, LLM_ENDPOINT
 
 
 app = FastAPI(title="Brand2Context API", version="0.2.0")
@@ -660,13 +657,13 @@ def chat_with_brand(brand_id: str, body: ChatRequest, db: Session = Depends(get_
 
     try:
         resp = httpx.post(
-            "https://api.minimax.chat/v1/text/chatcompletion_v2",
+            LLM_ENDPOINT,
             headers={
-                "Authorization": f"Bearer {MINIMAX_API_KEY}",
+                "Authorization": f"Bearer {LLM_API_KEY}",
                 "Content-Type": "application/json",
             },
             json={
-                "model": "MiniMax-M2.7",
+                "model": LLM_MODEL,
                 "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": body.message},
