@@ -34,6 +34,8 @@ import {
   batchDeleteBrands,
   batchRefreshBrands,
   refreshBrand,
+  cancelBrandTask,
+  cancelAllTasks,
   Brand,
 } from "@/lib/api";
 import {
@@ -63,6 +65,11 @@ import {
   ChevronLeft,
   ChevronRight,
   CheckSquare,
+  Activity,
+  Square,
+  Ban,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 
 const STATUS_COLORS = {
@@ -110,6 +117,328 @@ function Modal({
     </div>
   );
 }
+
+// ============================================================
+// Task Monitor Panel
+// ============================================================
+
+const STEP_ORDER = ["pending", "crawling", "searching", "structuring", "done"];
+const STEP_LABELS: Record<string, string> = {
+  pending: "等待中",
+  crawling: "爬取网页",
+  searching: "搜索扩展",
+  structuring: "LLM 结构化",
+  done: "完成",
+  error: "出错",
+  unknown: "未知",
+};
+
+function formatElapsed(startedAt?: string): string {
+  if (!startedAt) return "-";
+  const start = new Date(startedAt).getTime();
+  const now = Date.now();
+  const sec = Math.floor((now - start) / 1000);
+  if (sec < 60) return `${sec}s`;
+  const min = Math.floor(sec / 60);
+  const remSec = sec % 60;
+  if (min < 60) return `${min}m ${remSec}s`;
+  const hr = Math.floor(min / 60);
+  return `${hr}h ${min % 60}m`;
+}
+
+function StepProgress({ step }: { step: string }) {
+  const activeIdx = STEP_ORDER.indexOf(step);
+  return (
+    <div className="flex items-center gap-1">
+      {STEP_ORDER.slice(1, -1).map((s, i) => {
+        const idx = i + 1; // offset because we skip "pending"
+        const isActive = step === s;
+        const isDone = activeIdx > idx;
+        return (
+          <div key={s} className="flex items-center gap-1">
+            <div
+              className={`w-2 h-2 rounded-full transition-all ${
+                isActive
+                  ? "bg-blue-400 animate-pulse ring-2 ring-blue-400/30"
+                  : isDone
+                  ? "bg-green-400"
+                  : "bg-gray-600"
+              }`}
+              title={STEP_LABELS[s]}
+            />
+            {i < 2 && (
+              <div className={`w-4 h-0.5 ${isDone ? "bg-green-400/50" : "bg-gray-700"}`} />
+            )}
+          </div>
+        );
+      })}
+      <span className={`ml-2 text-xs ${step === "error" ? "text-red-400" : "text-gray-400"}`}>
+        {STEP_LABELS[step] || step}
+      </span>
+    </div>
+  );
+}
+
+function TaskMonitorPanel({
+  batchStatus,
+  onPause,
+  onResume,
+  onCancelBrand,
+  onCancelAll,
+  onRetryFailed,
+  onRefreshBrand,
+}: {
+  batchStatus: BatchStatus | null;
+  onPause: () => void;
+  onResume: () => void;
+  onCancelBrand: (brandId: string) => void;
+  onCancelAll: () => void;
+  onRetryFailed: () => void;
+  onRefreshBrand: (brandId: string) => void;
+}) {
+  const [expandedFailed, setExpandedFailed] = useState<Set<string>>(new Set());
+  const [showCompleted, setShowCompleted] = useState(false);
+
+  if (!batchStatus) {
+    return (
+      <div className="text-center py-16 text-gray-500">
+        <Activity className="w-12 h-12 mx-auto mb-4 opacity-30" />
+        <p className="text-lg font-medium mb-1">暂无任务</p>
+        <p className="text-sm">在「行业管理」或「批量爬取」中启动任务后，这里会显示实时进度</p>
+      </div>
+    );
+  }
+
+  const total = batchStatus.total || 0;
+  const completed = batchStatus.completed || 0;
+  const failed = batchStatus.failed || 0;
+  const cancelled = batchStatus.cancelled || 0;
+  const processing = batchStatus.processing || 0;
+  const queued = batchStatus.queued || 0;
+  const progressPct = total > 0 ? Math.round(((completed + failed + cancelled) / total) * 100) : 0;
+  const isActive = processing > 0 || queued > 0;
+  const isDone = total > 0 && processing === 0 && queued === 0;
+
+  const toggleFailed = (id: string) => {
+    setExpandedFailed((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Status Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="bg-gray-800/60 rounded-xl p-4 border border-gray-700">
+          <div className="text-xs text-gray-400 mb-1">运行中</div>
+          <div className="text-2xl font-bold text-blue-400">{processing}</div>
+        </div>
+        <div className="bg-gray-800/60 rounded-xl p-4 border border-gray-700">
+          <div className="text-xs text-gray-400 mb-1">排队中</div>
+          <div className="text-2xl font-bold text-yellow-400">{queued}</div>
+        </div>
+        <div className="bg-gray-800/60 rounded-xl p-4 border border-gray-700">
+          <div className="text-xs text-gray-400 mb-1">已完成</div>
+          <div className="text-2xl font-bold text-green-400">{completed}</div>
+        </div>
+        <div className="bg-gray-800/60 rounded-xl p-4 border border-gray-700">
+          <div className="text-xs text-gray-400 mb-1">失败</div>
+          <div className="text-2xl font-bold text-red-400">{failed}</div>
+        </div>
+        <div className="bg-gray-800/60 rounded-xl p-4 border border-gray-700">
+          <div className="text-xs text-gray-400 mb-1">总计</div>
+          <div className="text-2xl font-bold text-gray-200">{total}</div>
+        </div>
+      </div>
+
+      {/* Progress Bar + Controls */}
+      <div className="bg-gray-800/40 rounded-xl p-4 border border-gray-700">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium">
+              {isDone ? "✅ 批次完成" : isActive ? "⏳ 进行中" : total === 0 ? "等待任务" : "已暂停"}
+            </span>
+            {batchStatus.task_id && (
+              <span className="text-xs text-gray-500 font-mono">#{batchStatus.task_id}</span>
+            )}
+            {batchStatus.paused && (
+              <span className="px-2 py-0.5 text-xs rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
+                已暂停
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {isActive && !batchStatus.paused && (
+              <button
+                onClick={onPause}
+                className="px-3 py-1.5 rounded-lg bg-yellow-600/20 text-yellow-400 border border-yellow-600/30 text-xs font-medium hover:bg-yellow-600/30 transition flex items-center gap-1"
+              >
+                <Pause className="w-3 h-3" /> 暂停
+              </button>
+            )}
+            {batchStatus.paused && (
+              <button
+                onClick={onResume}
+                className="px-3 py-1.5 rounded-lg bg-green-600/20 text-green-400 border border-green-600/30 text-xs font-medium hover:bg-green-600/30 transition flex items-center gap-1"
+              >
+                <Play className="w-3 h-3" /> 继续
+              </button>
+            )}
+            {queued > 0 && (
+              <button
+                onClick={onCancelAll}
+                className="px-3 py-1.5 rounded-lg bg-red-600/20 text-red-400 border border-red-600/30 text-xs font-medium hover:bg-red-600/30 transition flex items-center gap-1"
+              >
+                <Ban className="w-3 h-3" /> 取消排队 ({queued})
+              </button>
+            )}
+            {failed > 0 && (
+              <button
+                onClick={onRetryFailed}
+                className="px-3 py-1.5 rounded-lg bg-orange-600/20 text-orange-400 border border-orange-600/30 text-xs font-medium hover:bg-orange-600/30 transition flex items-center gap-1"
+              >
+                <RotateCcw className="w-3 h-3" /> 重试失败 ({failed})
+              </button>
+            )}
+          </div>
+        </div>
+        <div className="w-full bg-gray-700 rounded-full h-2.5">
+          <div
+            className={`h-2.5 rounded-full transition-all duration-500 ${
+              isDone ? "bg-green-500" : "bg-blue-500"
+            }`}
+            style={{ width: `${progressPct}%` }}
+          />
+        </div>
+        <div className="text-xs text-gray-500 mt-1 text-right">
+          {completed + failed + cancelled} / {total} ({progressPct}%)
+        </div>
+      </div>
+
+      {/* Running Tasks */}
+      {batchStatus.running_items.length > 0 && (
+        <div className="bg-gray-800/40 rounded-xl border border-gray-700 overflow-hidden">
+          <div className="px-4 py-3 bg-blue-500/10 border-b border-gray-700 flex items-center gap-2">
+            <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
+            <span className="text-sm font-medium text-blue-400">正在运行 ({processing})</span>
+          </div>
+          <div className="divide-y divide-gray-700/50">
+            {batchStatus.running_items.map((item) => (
+              <div key={item.brand_id} className="px-4 py-3 flex items-center justify-between hover:bg-gray-700/20 transition">
+                <div className="flex-1 min-w-0 mr-4">
+                  <div className="text-sm font-medium truncate">{item.name || "—"}</div>
+                  <div className="text-xs text-gray-500 truncate">{item.url}</div>
+                </div>
+                <div className="flex items-center gap-4">
+                  <StepProgress step={item.progress_step || "pending"} />
+                  <span className="text-xs text-gray-500 font-mono w-16 text-right">
+                    {formatElapsed(item.started_at)}
+                  </span>
+                  <button
+                    onClick={() => onCancelBrand(item.brand_id)}
+                    className="p-1 rounded hover:bg-red-500/20 text-gray-500 hover:text-red-400 transition"
+                    title="取消此任务"
+                  >
+                    <Square className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Failed Tasks */}
+      {batchStatus.failed_items.length > 0 && (
+        <div className="bg-gray-800/40 rounded-xl border border-red-900/30 overflow-hidden">
+          <div className="px-4 py-3 bg-red-500/10 border-b border-gray-700 flex items-center gap-2">
+            <XCircle className="w-4 h-4 text-red-400" />
+            <span className="text-sm font-medium text-red-400">失败 ({failed})</span>
+          </div>
+          <div className="divide-y divide-gray-700/50">
+            {batchStatus.failed_items.map((item, idx) => {
+              const key = item.brand_id || `f-${idx}`;
+              const isExpanded = expandedFailed.has(key);
+              return (
+                <div key={key}>
+                  <div
+                    className="px-4 py-3 flex items-center justify-between hover:bg-gray-700/20 transition cursor-pointer"
+                    onClick={() => toggleFailed(key)}
+                  >
+                    <div className="flex-1 min-w-0 mr-4">
+                      <div className="text-sm font-medium truncate">{item.name || "—"}</div>
+                      <div className="text-xs text-gray-500 truncate">{item.url}</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {item.brand_id && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); onRefreshBrand(item.brand_id); }}
+                          className="px-2 py-1 rounded text-xs bg-orange-600/20 text-orange-400 hover:bg-orange-600/30 transition"
+                        >
+                          重试
+                        </button>
+                      )}
+                      {isExpanded ? (
+                        <ChevronUp className="w-4 h-4 text-gray-500" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-gray-500" />
+                      )}
+                    </div>
+                  </div>
+                  {isExpanded && item.error && (
+                    <div className="px-4 pb-3">
+                      <div className="p-3 rounded bg-red-950/30 border border-red-900/20 text-xs text-red-300 font-mono whitespace-pre-wrap break-all">
+                        {item.error}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Completed Tasks (collapsible) */}
+      {batchStatus.completed_items.length > 0 && (
+        <div className="bg-gray-800/40 rounded-xl border border-gray-700 overflow-hidden">
+          <div
+            className="px-4 py-3 bg-green-500/10 border-b border-gray-700 flex items-center justify-between cursor-pointer hover:bg-green-500/15 transition"
+            onClick={() => setShowCompleted(!showCompleted)}
+          >
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-4 h-4 text-green-400" />
+              <span className="text-sm font-medium text-green-400">已完成 ({completed})</span>
+            </div>
+            {showCompleted ? (
+              <ChevronUp className="w-4 h-4 text-gray-500" />
+            ) : (
+              <ChevronDown className="w-4 h-4 text-gray-500" />
+            )}
+          </div>
+          {showCompleted && (
+            <div className="divide-y divide-gray-700/50 max-h-60 overflow-y-auto">
+              {batchStatus.completed_items.slice().reverse().map((item, idx) => (
+                <div key={item.brand_id || `c-${idx}`} className="px-4 py-2 flex items-center justify-between">
+                  <div className="flex-1 min-w-0 mr-4">
+                    <div className="text-sm truncate">{item.name || "—"}</div>
+                    <div className="text-xs text-gray-500 truncate">{item.url}</div>
+                  </div>
+                  <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
 
 function AIGenerateModal({
   open,
@@ -308,7 +637,7 @@ function ManualAddModal({
 }
 
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState<"seeds" | "batch" | "refresh" | "industry" | "brands">("seeds");
+  const [activeTab, setActiveTab] = useState<"seeds" | "batch" | "refresh" | "industry" | "brands" | "tasks">("seeds");
   const [dashboard, setDashboard] = useState<AdminDashboard | null>(null);
   const [seeds, setSeeds] = useState<Seed[]>([]);
   const [seedsTotal, setSeedsTotal] = useState(0);
@@ -428,6 +757,10 @@ export default function AdminPage() {
     if (activeTab === "batch") {
       fetchBatchStatus();
       pollingRef.current = setInterval(fetchBatchStatus, 5000);
+    } else if (activeTab === "tasks") {
+      fetchBatchStatus();
+      const interval = batchStatus?.processing ? 3000 : 10000;
+      pollingRef.current = setInterval(fetchBatchStatus, interval);
     } else if (activeTab === "industry") {
       fetchIndustryStats();
       pollingRef.current = setInterval(fetchIndustryStats, 10000);
@@ -814,6 +1147,22 @@ export default function AdminPage() {
             >
               <RefreshCw className="w-4 h-4 inline mr-2" />
               更新调度
+            </button>
+            <button
+              onClick={() => setActiveTab("tasks")}
+              className={`px-6 py-3 text-sm font-medium transition ${
+                activeTab === "tasks"
+                  ? "text-primary-400 border-b-2 border-primary-400 bg-primary-950/20"
+                  : "text-gray-400 hover:text-gray-200"
+              }`}
+            >
+              <Activity className="w-4 h-4 inline mr-2" />
+              任务监控
+              {batchStatus && batchStatus.processing > 0 && (
+                <span className="ml-2 px-1.5 py-0.5 text-xs rounded-full bg-blue-500/20 text-blue-400 animate-pulse">
+                  {batchStatus.processing}
+                </span>
+              )}
             </button>
           </div>
 
@@ -1504,6 +1853,18 @@ export default function AdminPage() {
                   </div>
                 </div>
               </div>
+            )}
+
+            {activeTab === "tasks" && (
+              <TaskMonitorPanel
+                batchStatus={batchStatus}
+                onPause={async () => { await pauseBatch(); fetchBatchStatus(); }}
+                onResume={async () => { await resumeBatch(); fetchBatchStatus(); }}
+                onCancelBrand={async (brandId) => { await cancelBrandTask(brandId); fetchBatchStatus(); }}
+                onCancelAll={async () => { await cancelAllTasks(); fetchBatchStatus(); }}
+                onRetryFailed={async () => { await retryFailedBatch(); fetchBatchStatus(); }}
+                onRefreshBrand={async (brandId) => { await refreshBrand(brandId); fetchBatchStatus(); }}
+              />
             )}
           </div>
         </div>

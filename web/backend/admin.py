@@ -313,9 +313,11 @@ class BatchQueue:
         self.running = {}
         self.completed = []
         self.failed = []
+        self.cancelled = []
         self.paused = False
         self.task_id = None
         self.total = 0
+        self.started_at = None
         self._lock = threading.Lock()
         self._worker_thread = None
 
@@ -323,9 +325,11 @@ class BatchQueue:
         self.task_id = str(uuid.uuid4())[:8]
         self.completed = []
         self.failed = []
+        self.cancelled = []
         self.running = {}
         self.paused = False
         self.total = len(brands_to_crawl)
+        self.started_at = datetime.now(timezone.utc).isoformat()
 
         for b in brands_to_crawl:
             self.q.put(b)
@@ -359,20 +363,28 @@ class BatchQueue:
                     brand = db.query(Brand).filter(Brand.id == bid).first()
                     if brand and brand.status == "done":
                         self.completed.append(
-                            {"name": info["name"], "url": info["url"], "brand_id": bid}
+                            {"name": info["name"], "url": info["url"], "brand_id": bid,
+                             "finished_at": datetime.now(timezone.utc).isoformat()}
                         )
                     elif brand and brand.status == "error":
-                        self.failed.append(
-                            {
-                                "name": info["name"],
-                                "url": info["url"],
-                                "brand_id": bid,
-                                "error": brand.error_message,
-                            }
-                        )
+                        error_msg = brand.error_message or ""
+                        if "Cancelled" in error_msg:
+                            self.cancelled.append(
+                                {"name": info["name"], "url": info["url"], "brand_id": bid}
+                            )
+                        else:
+                            self.failed.append(
+                                {
+                                    "name": info["name"],
+                                    "url": info["url"],
+                                    "brand_id": bid,
+                                    "error": brand.error_message,
+                                }
+                            )
                     else:
                         self.completed.append(
-                            {"name": info["name"], "url": info["url"], "brand_id": bid}
+                            {"name": info["name"], "url": info["url"], "brand_id": bid,
+                             "finished_at": datetime.now(timezone.utc).isoformat()}
                         )
                     db.close()
 
@@ -402,8 +414,12 @@ class BatchQueue:
                 )
                 t.start()
 
+                now = datetime.now(timezone.utc).isoformat()
                 with self._lock:
-                    self.running[brand_id] = {"thread": t, "name": name, "url": url}
+                    self.running[brand_id] = {
+                        "thread": t, "name": name, "url": url,
+                        "started_at": now,
+                    }
 
             time.sleep(2)
 
@@ -413,12 +429,62 @@ class BatchQueue:
     def resume(self):
         self.paused = False
 
+    def cancel_brand(self, brand_id: str):
+        """Cancel a single running or queued brand task."""
+        db = SessionLocal()
+        brand = db.query(Brand).filter(Brand.id == brand_id).first()
+        if brand and brand.status in ("processing", "pending"):
+            brand.status = "error"
+            brand.progress_step = "error"
+            brand.error_message = "Cancelled by user"
+            brand.updated_at = datetime.now(timezone.utc)
+            db.commit()
+        db.close()
+        # Remove from running dict (thread will finish on its own but brand is marked)
+        with self._lock:
+            if brand_id in self.running:
+                info = self.running.pop(brand_id)
+                self.cancelled.append(
+                    {"name": info["name"], "url": info["url"], "brand_id": brand_id}
+                )
+
+    def cancel_all_queued(self):
+        """Cancel all queued (not yet running) tasks."""
+        cancelled_count = 0
+        while not self.q.empty():
+            try:
+                item = self.q.get_nowait()
+                cancelled_count += 1
+                self.cancelled.append(
+                    {"name": item.get("name", ""), "url": item.get("url", "")}
+                )
+            except queue.Empty:
+                break
+        self.total -= cancelled_count
+        return cancelled_count
+
     def status(self):
         with self._lock:
-            running_list = [
-                {"name": v["name"], "url": v["url"], "brand_id": k}
-                for k, v in self.running.items()
-            ]
+            running_list = []
+            for k, v in self.running.items():
+                item = {
+                    "name": v["name"], "url": v["url"], "brand_id": k,
+                    "started_at": v.get("started_at"),
+                }
+                running_list.append(item)
+
+        # Enrich running items with progress_step from DB
+        if running_list:
+            db = SessionLocal()
+            for item in running_list:
+                brand = db.query(Brand).filter(Brand.id == item["brand_id"]).first()
+                if brand:
+                    item["progress_step"] = brand.progress_step or "pending"
+                    item["name"] = brand.name or item["name"]
+                else:
+                    item["progress_step"] = "unknown"
+            db.close()
+
         return {
             "task_id": self.task_id,
             "total": self.total,
@@ -426,10 +492,13 @@ class BatchQueue:
             "processing": len(running_list),
             "queued": self.q.qsize(),
             "failed": len(self.failed),
+            "cancelled": len(self.cancelled),
             "paused": self.paused,
+            "started_at": self.started_at,
             "running_items": running_list,
-            "completed_items": self.completed[-20:],
+            "completed_items": self.completed[-50:],
             "failed_items": self.failed,
+            "cancelled_items": self.cancelled[-20:],
         }
 
     def retry_failed(self):
@@ -532,6 +601,20 @@ def resume_batch(current_user: User = Depends(get_current_admin_user)):
 def retry_failed(current_user: User = Depends(get_current_admin_user)):
     count = batch_queue.retry_failed()
     return {"message": f"Retrying {count} failed brands", "count": count}
+
+
+@admin_router.post("/batch/cancel/{brand_id}")
+def cancel_brand_task(
+    brand_id: str, current_user: User = Depends(get_current_admin_user)
+):
+    batch_queue.cancel_brand(brand_id)
+    return {"message": f"Cancelled brand {brand_id}"}
+
+
+@admin_router.post("/batch/cancel-all")
+def cancel_all_tasks(current_user: User = Depends(get_current_admin_user)):
+    count = batch_queue.cancel_all_queued()
+    return {"message": f"Cancelled {count} queued tasks", "count": count}
 
 
 class RetryDBRequest(BaseModel):

@@ -192,10 +192,13 @@ export interface BatchStatus {
   processing: number;
   queued: number;
   failed: number;
+  cancelled: number;
   paused: boolean;
-  running_items: { name: string; url: string; brand_id: string }[];
-  completed_items: { name: string; url: string; brand_id: string }[];
+  started_at: string | null;
+  running_items: { name: string; url: string; brand_id: string; progress_step?: string; started_at?: string }[];
+  completed_items: { name: string; url: string; brand_id: string; finished_at?: string }[];
   failed_items: { name: string; url: string; brand_id: string; error?: string }[];
+  cancelled_items: { name: string; url: string; brand_id?: string }[];
 }
 
 export interface AdminSettings {
@@ -305,6 +308,23 @@ export async function retryFailedBatch(): Promise<void> {
     headers: { ...getAuthHeaders() },
   });
   if (!res.ok) throw new Error("Failed to retry failed");
+}
+
+export async function cancelBrandTask(brandId: string): Promise<void> {
+  const res = await fetch(`${API_URL}/api/admin/batch/cancel/${brandId}`, {
+    method: "POST",
+    headers: { ...getAuthHeaders() },
+  });
+  if (!res.ok) throw new Error("Failed to cancel brand task");
+}
+
+export async function cancelAllTasks(): Promise<{ message: string; count: number }> {
+  const res = await fetch(`${API_URL}/api/admin/batch/cancel-all`, {
+    method: "POST",
+    headers: { ...getAuthHeaders() },
+  });
+  if (!res.ok) throw new Error("Failed to cancel all tasks");
+  return res.json();
 }
 
 export async function getRefreshStatus(): Promise<{ total_brands: number; up_to_date: number; outdated: number; outdated_brands: { id: string; name: string; url: string; last_refreshed: string | null; days_since: number }[]; refresh_cycle_days: number }> {
