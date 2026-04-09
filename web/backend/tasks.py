@@ -347,6 +347,11 @@ def run_brand_pipeline(brand_id: str, url: str):
                 category=brand.category or "",
                 data_dir=DATA_DIR,
             )
+            # Agent pipeline stores data in {brand_id}/brand_knowledge.json
+            # but the rest of the app expects {brand_id}.json — write both
+            output_path = os.path.join(DATA_DIR, f"{brand_id}.json")
+            with open(output_path, "w", encoding="utf-8") as f:
+                json.dump(result, f, ensure_ascii=False, indent=2)
         except Exception as e:
             print(f"⚠️ Agent pipeline failed: {e}, falling back to legacy pipeline")
             result = _legacy_pipeline(brand_id, url, brand, db)
