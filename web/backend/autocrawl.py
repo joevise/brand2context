@@ -178,7 +178,7 @@ class AutoCrawlEngine:
         return urls
 
     def _crawl_brand(self, name: str, url: str, category: str) -> str:
-        """Submit a brand to the crawl pipeline. Returns brand_id."""
+        """Submit a brand to the crawl pipeline via BatchQueue so it shows in Task Monitor."""
         from tasks import run_brand_pipeline
 
         db = SessionLocal()
@@ -188,13 +188,41 @@ class AutoCrawlEngine:
         db.commit()
         db.close()
 
-        # Run synchronously so we can track one at a time
-        run_brand_pipeline(brand_id, url)
+        # Register in BatchQueue for visibility in Task Monitor
+        import threading as _threading
+        t = _threading.Thread(target=run_brand_pipeline, args=(brand_id, url), daemon=True)
+        t.start()
+
+        now = datetime.now(timezone.utc).isoformat()
+        batch_queue.total += 1
+        with batch_queue._lock:
+            batch_queue.running[brand_id] = {
+                "thread": t, "name": name, "url": url,
+                "started_at": now,
+            }
+
+        # Wait for completion (synchronous for autocrawl sequencing)
+        t.join(timeout=600)  # 10 min max per brand
+
+        # Clean up from BatchQueue running dict
+        with batch_queue._lock:
+            if brand_id in batch_queue.running:
+                batch_queue.running.pop(brand_id)
 
         # Check result
         db = SessionLocal()
         brand = db.query(Brand).filter(Brand.id == brand_id).first()
         status = brand.status if brand else "unknown"
+        if status == "done":
+            batch_queue.completed.append(
+                {"name": name, "url": url, "brand_id": brand_id,
+                 "finished_at": datetime.now(timezone.utc).isoformat()}
+            )
+        elif status == "error":
+            batch_queue.failed.append(
+                {"name": name, "url": url, "brand_id": brand_id,
+                 "error": brand.error_message if brand else "unknown"}
+            )
         db.close()
 
         return status
