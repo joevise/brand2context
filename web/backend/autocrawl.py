@@ -380,8 +380,12 @@ class AutoCrawlEngine:
 
                 self._save_state()
 
-                # Pause between brands
+                # Adaptive pause: slow down if we're hitting errors
                 pause_sec = self.config.get("pause_between_brands_sec", 10)
+                if status == "error":
+                    # Back off more on errors (likely API overload)
+                    pause_sec = max(pause_sec * 3, 30)
+                    self._log(f"⏳ Error cooldown: waiting {pause_sec}s before next brand")
                 if pause_sec > 0:
                     self._stop_event.wait(pause_sec)
 
