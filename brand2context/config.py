@@ -2,13 +2,13 @@ import os
 
 LINK2CONTEXT_BASE = os.getenv("LINK2CONTEXT_URL", "http://67.209.190.54:8000")
 
-# LLM Configuration — GLM-4-Flash (free, unlimited)
+# LLM Configuration — MiniMax M2.7
 LLM_API_KEY = os.getenv(
     "LLM_API_KEY",
-    "63078dbeb7e0b19197c7a44e64b7228e.4IPyp2wgiLZMhKAb",
+    "sk-cp-49r5TFMzeb7-z-HCbtIPK3h7NZPVs8QJIPVIBC9S3JDjeHq4pKU6YZ-srAyN1YH3-LR6wS0ot4f6xEcqR34SsBpE-yPuW-9kb_yGlDRaive4lhwduA3UAZs",
 )
-LLM_MODEL = os.getenv("LLM_MODEL", "glm-4-flash")
-LLM_ENDPOINT = os.getenv("LLM_ENDPOINT", "https://open.bigmodel.cn/api/paas/v4/chat/completions")
+LLM_MODEL = os.getenv("LLM_MODEL", "MiniMax-M2.7")
+LLM_ENDPOINT = os.getenv("LLM_ENDPOINT", "https://api.minimax.chat/v1/chat/completions")
 
 # Legacy aliases (for backward compatibility with llm.py etc.)
 MINIMAX_API_KEY = LLM_API_KEY
