@@ -88,7 +88,7 @@ def judge_completeness(
 - action 只有两种: "search"（搜索补充）或 "crawl"（抓取指定页面）
 - search 的 query 必须是具体可执行的搜索词
 - crawl 的 target 是 URL 路径（如 /products）或完整 URL
-- overall_score >= 7 且 identity >= 6 且 offerings >= 6 才算 is_sufficient: true
+- overall_score >= 7 且 核心5维度(identity, offerings, differentiation, trust, access)都 >= 5 才算 is_sufficient: true
 - gaps 数组最多 8 条（优先补最重要的缺口）"""
 
     result = chat_json(
@@ -101,11 +101,10 @@ def judge_completeness(
         result["gaps"] = []
     if "is_sufficient" not in result:
         overall = result.get("overall_score", 0)
-        identity_score = result.get("scores", {}).get("identity", 0)
-        offerings_score = result.get("scores", {}).get("offerings", 0)
-        result["is_sufficient"] = (
-            overall >= 7 and identity_score >= 6 and offerings_score >= 6
-        )
+        scores = result.get("scores", {})
+        core_dims = ["identity", "offerings", "differentiation", "trust", "access"]
+        core_ok = all(scores.get(d, 0) >= 5 for d in core_dims)
+        result["is_sufficient"] = overall >= 7 and core_ok
     if "overall_score" not in result:
         scores = result.get("scores", {})
         result["overall_score"] = sum(scores.values()) / max(len(scores), 1)

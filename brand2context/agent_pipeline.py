@@ -20,8 +20,8 @@ from .structurer import (
 from .llm import chat_json
 from .config import SCHEMA_PATH, MAX_CRAWL_PAGES
 
-MAX_ROUNDS = 3
-PIPELINE_TIMEOUT = 600
+MAX_ROUNDS = 5
+PIPELINE_TIMEOUT = 900
 
 
 def run_agent_pipeline(

@@ -26,6 +26,7 @@ from admin import get_current_admin_user, batch_queue
 
 # LLM config from brand2context config
 import sys as _sys
+
 _sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 from brand2context.config import LLM_API_KEY, LLM_MODEL, LLM_ENDPOINT
 
@@ -33,12 +34,36 @@ STATE_FILE = os.path.join(os.path.dirname(__file__), "data", "autocrawl_state.js
 
 # Default industry list (Chinese market focused)
 DEFAULT_INDUSTRIES = [
-    "科技互联网", "电商平台", "汽车", "金融保险", "医药健康",
-    "教育培训", "餐饮连锁", "消费品", "美妆个护", "家电家居",
-    "运动户外", "奢侈品时尚", "游戏娱乐", "旅游酒店", "房地产",
-    "物流快递", "新能源", "人工智能", "半导体芯片", "文化传媒",
-    "母婴用品", "宠物经济", "茶饮咖啡", "零食休闲", "服装鞋帽",
-    "珠宝钟表", "家装建材", "农业食品", "工业制造", "通讯设备",
+    "科技互联网",
+    "电商平台",
+    "汽车",
+    "金融保险",
+    "医药健康",
+    "教育培训",
+    "餐饮连锁",
+    "消费品",
+    "美妆个护",
+    "家电家居",
+    "运动户外",
+    "奢侈品时尚",
+    "游戏娱乐",
+    "旅游酒店",
+    "房地产",
+    "物流快递",
+    "新能源",
+    "人工智能",
+    "半导体芯片",
+    "文化传媒",
+    "母婴用品",
+    "宠物经济",
+    "茶饮咖啡",
+    "零食休闲",
+    "服装鞋帽",
+    "珠宝钟表",
+    "家装建材",
+    "农业食品",
+    "工业制造",
+    "通讯设备",
 ]
 
 DEFAULT_CONFIG = {
@@ -115,7 +140,9 @@ class AutoCrawlEngine:
                 saved_config = state.get("config")
                 if saved_config:
                     self.config.update(saved_config)
-                self._log(f"Loaded state: {self.total_crawled} crawled, idx={self.current_industry_idx}")
+                self._log(
+                    f"Loaded state: {self.total_crawled} crawled, idx={self.current_industry_idx}"
+                )
             except Exception as e:
                 self._log(f"Failed to load state: {e}")
 
@@ -142,32 +169,26 @@ class AutoCrawlEngine:
         )
         data = resp.json()
         if not data.get("choices"):
-            raise ValueError(f"LLM error: {data.get('base_resp', {}).get('status_msg', 'unknown')}")
+            raise ValueError(
+                f"LLM error: {data.get('base_resp', {}).get('status_msg', 'unknown')}"
+            )
         return data["choices"][0]["message"]["content"]
 
     def _discover_brands(self, industry: str, count: int = 30) -> list:
-        """Use LLM to discover top brands in an industry."""
-        prompt = f"""列出"{industry}"行业的{count}个最知名品牌（优先中国市场的品牌，包括在中国运营的国际品牌），按知名度从高到低排序。
+        """Use ResearchAgent to discover top brands in an industry."""
+        from brand2context.research_agent import ResearchAgent
 
-输出JSON数组，每个品牌格式：{{"name":"品牌名","url":"https://官网"}}
-
-要求：
-1. URL 必须是品牌真实官网（不是百度百科、维基等第三方页面）
-2. 从行业龙头开始，逐步到中小品牌
-3. 只输出JSON数组，不要其他文字"""
-
-        content = self._llm_call(prompt)
-        # Parse JSON
-        if "```json" in content:
-            content = content.split("```json")[1].split("```")[0]
-        elif "```" in content:
-            content = content.split("```")[1].split("```")[0]
-        try:
-            brands = json.loads(content.strip())
-            return brands
-        except json.JSONDecodeError:
-            self._log(f"Failed to parse brand list for {industry}")
-            return []
+        knowledge_file = os.path.join(
+            os.path.dirname(STATE_FILE),
+            "..",
+            "..",
+            "brand2context",
+            "data",
+            "research_knowledge.json",
+        )
+        agent = ResearchAgent(knowledge_file=knowledge_file)
+        seeds = agent.discover_brands(industry, limit=count)
+        return [{"name": s["name"], "url": s["url"]} for s in seeds if s.get("url")]
 
     def _get_existing_urls(self) -> set:
         db = SessionLocal()
@@ -183,21 +204,28 @@ class AutoCrawlEngine:
 
         db = SessionLocal()
         brand_id = str(uuid.uuid4())
-        brand = Brand(id=brand_id, url=url, status="pending", category=category, name=name)
+        brand = Brand(
+            id=brand_id, url=url, status="pending", category=category, name=name
+        )
         db.add(brand)
         db.commit()
         db.close()
 
         # Register in BatchQueue for visibility in Task Monitor
         import threading as _threading
-        t = _threading.Thread(target=run_brand_pipeline, args=(brand_id, url), daemon=True)
+
+        t = _threading.Thread(
+            target=run_brand_pipeline, args=(brand_id, url), daemon=True
+        )
         t.start()
 
         now = datetime.now(timezone.utc).isoformat()
         batch_queue.total += 1
         with batch_queue._lock:
             batch_queue.running[brand_id] = {
-                "thread": t, "name": name, "url": url,
+                "thread": t,
+                "name": name,
+                "url": url,
                 "started_at": now,
             }
 
@@ -215,13 +243,21 @@ class AutoCrawlEngine:
         status = brand.status if brand else "unknown"
         if status == "done":
             batch_queue.completed.append(
-                {"name": name, "url": url, "brand_id": brand_id,
-                 "finished_at": datetime.now(timezone.utc).isoformat()}
+                {
+                    "name": name,
+                    "url": url,
+                    "brand_id": brand_id,
+                    "finished_at": datetime.now(timezone.utc).isoformat(),
+                }
             )
         elif status == "error":
             batch_queue.failed.append(
-                {"name": name, "url": url, "brand_id": brand_id,
-                 "error": brand.error_message if brand else "unknown"}
+                {
+                    "name": name,
+                    "url": url,
+                    "brand_id": brand_id,
+                    "error": brand.error_message if brand else "unknown",
+                }
             )
         db.close()
 
@@ -261,10 +297,14 @@ class AutoCrawlEngine:
 
             # Check daily limit
             if self.today_count >= self.config["daily_limit"]:
-                self._log(f"Daily limit reached ({self.today_count}/{self.config['daily_limit']}). Sleeping until tomorrow...")
+                self._log(
+                    f"Daily limit reached ({self.today_count}/{self.config['daily_limit']}). Sleeping until tomorrow..."
+                )
                 # Sleep until midnight UTC
                 now = datetime.now(timezone.utc)
-                tomorrow = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+                tomorrow = (now + timedelta(days=1)).replace(
+                    hour=0, minute=0, second=0, microsecond=0
+                )
                 sleep_secs = (tomorrow - now).total_seconds()
                 self._stop_event.wait(min(sleep_secs, 3600))  # Check every hour
                 continue
@@ -276,7 +316,9 @@ class AutoCrawlEngine:
 
             # Pick current industry
             if self.current_industry_idx >= len(industries):
-                self._log("All industries completed! Restarting from the beginning with deeper crawl...")
+                self._log(
+                    "All industries completed! Restarting from the beginning with deeper crawl..."
+                )
                 self.current_industry_idx = 0
                 # Increase brands_per_industry for next round
                 self.config["brands_per_industry"] = min(
@@ -286,13 +328,19 @@ class AutoCrawlEngine:
 
             industry = industries[self.current_industry_idx]
             self.current_industry = industry
-            self._log(f"📂 Industry: {industry} (#{self.current_industry_idx + 1}/{len(industries)})")
+            self._log(
+                f"📂 Industry: {industry} (#{self.current_industry_idx + 1}/{len(industries)})"
+            )
 
             # Discover brands for this industry
-            if industry not in self.industry_progress or not self.industry_progress[industry].get("brands"):
+            if industry not in self.industry_progress or not self.industry_progress[
+                industry
+            ].get("brands"):
                 self._log(f"🔍 Discovering brands for {industry}...")
                 try:
-                    discovered = self._discover_brands(industry, self.config["brands_per_industry"])
+                    discovered = self._discover_brands(
+                        industry, self.config["brands_per_industry"]
+                    )
                     self.industry_progress[industry] = {
                         "total": len(discovered),
                         "done": 0,
@@ -315,7 +363,9 @@ class AutoCrawlEngine:
 
             if current_idx >= len(brands):
                 # Industry done
-                self._log(f"✅ Industry {industry} complete: {progress['done']} done, {progress['failed']} failed, {progress['skipped']} skipped")
+                self._log(
+                    f"✅ Industry {industry} complete: {progress['done']} done, {progress['failed']} failed, {progress['skipped']} skipped"
+                )
                 if industry not in self.industries_completed:
                     self.industries_completed.append(industry)
                 self.current_industry_idx += 1
@@ -326,7 +376,11 @@ class AutoCrawlEngine:
             existing_urls = self._get_existing_urls()
 
             # Process brands
-            while current_idx < len(brands) and self.running and not self._stop_event.is_set():
+            while (
+                current_idx < len(brands)
+                and self.running
+                and not self._stop_event.is_set()
+            ):
                 if self.paused:
                     self._stop_event.wait(5)
                     continue
@@ -385,7 +439,9 @@ class AutoCrawlEngine:
                 if status == "error":
                     # Back off more on errors (likely API overload)
                     pause_sec = max(pause_sec * 3, 30)
-                    self._log(f"⏳ Error cooldown: waiting {pause_sec}s before next brand")
+                    self._log(
+                        f"⏳ Error cooldown: waiting {pause_sec}s before next brand"
+                    )
                 if pause_sec > 0:
                     self._stop_event.wait(pause_sec)
 
@@ -479,7 +535,9 @@ class AutoCrawlConfig(BaseModel):
 
 
 @autocrawl_router.put("/config")
-def update_autocrawl_config(body: AutoCrawlConfig, current_user=Depends(get_current_admin_user)):
+def update_autocrawl_config(
+    body: AutoCrawlConfig, current_user=Depends(get_current_admin_user)
+):
     if body.daily_limit is not None:
         autocrawl_engine.config["daily_limit"] = body.daily_limit
     if body.concurrent is not None:
@@ -487,7 +545,9 @@ def update_autocrawl_config(body: AutoCrawlConfig, current_user=Depends(get_curr
     if body.brands_per_industry is not None:
         autocrawl_engine.config["brands_per_industry"] = body.brands_per_industry
     if body.pause_between_brands_sec is not None:
-        autocrawl_engine.config["pause_between_brands_sec"] = body.pause_between_brands_sec
+        autocrawl_engine.config["pause_between_brands_sec"] = (
+            body.pause_between_brands_sec
+        )
     if body.industries is not None:
         autocrawl_engine.config["industries"] = body.industries
     autocrawl_engine._save_state()
