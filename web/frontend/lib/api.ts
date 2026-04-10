@@ -633,6 +633,14 @@ export async function resetAutoCrawl(): Promise<void> {
   if (!res.ok) throw new Error("Failed to reset autocrawl");
 }
 
+export async function resetAutoCrawlDaily(): Promise<void> {
+  const res = await fetch(`${API_URL}/api/admin/autocrawl/reset-daily`, {
+    method: "POST",
+    headers: { ...getAuthHeaders() },
+  });
+  if (!res.ok) throw new Error("Failed to reset daily counter");
+}
+
 export async function skipAutoCrawlIndustry(): Promise<void> {
   const res = await fetch(`${API_URL}/api/admin/autocrawl/skip-industry`, {
     method: "POST",

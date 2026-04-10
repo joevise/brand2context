@@ -510,6 +510,15 @@ def reset_autocrawl(current_user=Depends(get_current_admin_user)):
     return {"message": "AutoCrawl progress reset"}
 
 
+@autocrawl_router.post("/reset-daily")
+def reset_daily_counter(current_user=Depends(get_current_admin_user)):
+    """Reset today's crawl counter so crawling can continue past daily_limit."""
+    old_count = autocrawl_engine.today_count
+    autocrawl_engine.today_count = 0
+    autocrawl_engine._log(f"Daily counter reset (was {old_count})")
+    return {"message": f"Daily counter reset from {old_count} to 0"}
+
+
 @autocrawl_router.post("/skip-industry")
 def skip_industry(current_user=Depends(get_current_admin_user)):
     """Skip current industry and move to next."""

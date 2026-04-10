@@ -45,6 +45,7 @@ import {
   updateAutoCrawlConfig,
   resetAutoCrawl,
   skipAutoCrawlIndustry,
+  resetAutoCrawlDaily,
   AutoCrawlStatus,
   Brand,
 } from "@/lib/api";
@@ -167,6 +168,7 @@ function AutoCrawlPanel() {
   const handlePause = async () => { await pauseAutoCrawl(); await fetchStatus(); };
   const handleResume = async () => { await resumeAutoCrawl(); await fetchStatus(); };
   const handleSkip = async () => { await skipAutoCrawlIndustry(); await fetchStatus(); };
+  const handleResetDaily = async () => { await resetAutoCrawlDaily(); await fetchStatus(); };
   const handleReset = async () => { if (confirm("确定重置所有自动扩张进度？")) { await resetAutoCrawl(); await fetchStatus(); } };
   const handleSaveConfig = async () => {
     await updateAutoCrawlConfig(configDraft);
@@ -243,9 +245,9 @@ function AutoCrawlPanel() {
             <div className="text-2xl font-bold text-red-400">{status.total_failed}</div>
             <div className="text-xs text-gray-500">失败</div>
           </div>
-          <div className="bg-gray-900/50 rounded-lg p-3 text-center">
+          <div className="bg-gray-900/50 rounded-lg p-3 text-center cursor-pointer hover:bg-gray-900/70 transition group" onClick={handleResetDaily} title="点击重置今日计数">
             <div className="text-2xl font-bold text-blue-400">{status.today_count}/{status.daily_limit}</div>
-            <div className="text-xs text-gray-500">今日/上限</div>
+            <div className="text-xs text-gray-500 group-hover:text-blue-400 transition">今日/上限 <span className="opacity-0 group-hover:opacity-100">🔄 重置</span></div>
           </div>
           <div className="bg-gray-900/50 rounded-lg p-3 text-center">
             <div className="text-2xl font-bold text-purple-400">{status.industries_completed.length}/{status.total_industries}</div>
