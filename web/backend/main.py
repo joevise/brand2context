@@ -853,15 +853,24 @@ def _evaluate_dimension(dim: str, data: any) -> dict:
         }
 
     if dim == "offerings":
+        # Handle both formats: list of items OR dict with "offerings"/"items" key
+        items = None
         if isinstance(data, list) and len(data) > 0:
+            items = data
+        elif isinstance(data, dict):
+            items = data.get("offerings") or data.get("items") or []
+            if isinstance(items, list) and len(items) == 0:
+                items = None
+
+        if items and len(items) > 0:
             filled_count = sum(
-                1 for item in data if isinstance(item, dict) and any(item.values())
+                1 for item in items if isinstance(item, dict) and any(item.values())
             )
-            score = min(100, int(filled_count / len(data) * 100))
-            filled = [f"item_{i}" for i in range(len(data))]
-            missing = []
-            status = "complete" if filled_count == len(data) else "partial"
-            reason = f"{filled_count}/{len(data)} offerings with data"
+            score = min(100, int(filled_count / max(5, len(items)) * 100))
+            filled = [f"item_{i}" for i in range(len(items))]
+            missing = [] if len(items) >= 5 else [f"need {5 - len(items)} more offerings"]
+            status = "complete" if len(items) >= 5 else "partial"
+            reason = f"{len(items)} offerings found ({filled_count} with full data)"
         else:
             score = 0
             missing = ["offerings list"]

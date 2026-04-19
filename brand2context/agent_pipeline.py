@@ -26,8 +26,95 @@ from .structurer import (
 from .llm import chat_json
 from .config import SCHEMA_PATH, MAX_CRAWL_PAGES
 
-MAX_ROUNDS = 5
+MAX_ROUNDS = 6
 PIPELINE_TIMEOUT = 900
+
+
+def _inject_strategy_actions(
+    gaps: list, scores: dict, round_num: int, brand_name: str, url: str
+) -> list:
+    """Inject smart actions when LLM judge fails to use explore/deep_search."""
+    existing_actions = {g.get("action") for g in gaps}
+    existing_dims_with_explore = {
+        g.get("dimension") for g in gaps if g.get("action") == "explore"
+    }
+
+    injected = []
+
+    if (
+        scores.get("offerings", 10) < 3
+        and round_num >= 2
+        and "offerings" not in existing_dims_with_explore
+    ):
+        injected.append(
+            {
+                "dimension": "offerings",
+                "missing": "auto: explore products",
+                "action": "explore",
+                "target_type": "products",
+            }
+        )
+
+    if (
+        scores.get("content", 10) < 3
+        and round_num >= 2
+        and "content" not in existing_dims_with_explore
+    ):
+        injected.append(
+            {
+                "dimension": "content",
+                "missing": "auto: explore news",
+                "action": "explore",
+                "target_type": "news",
+            }
+        )
+
+    if (
+        scores.get("trust", 10) < 3
+        and round_num >= 3
+        and "deep_search" not in existing_actions
+    ):
+        injected.append(
+            {
+                "dimension": "trust",
+                "missing": "auto: deep search partners",
+                "action": "deep_search",
+                "query": f"{brand_name} 合作伙伴 认证 partnerships certifications",
+            }
+        )
+
+    if scores.get("experience", 10) < 3 and round_num >= 3:
+        injected.append(
+            {
+                "dimension": "experience",
+                "missing": "auto: explore faq",
+                "action": "explore",
+                "target_type": "faq",
+            }
+        )
+
+    if (
+        scores.get("campaigns", 10) < 3
+        and round_num >= 3
+        and "deep_search" not in existing_actions
+    ):
+        injected.append(
+            {
+                "dimension": "campaigns",
+                "missing": "auto: deep search campaigns",
+                "action": "deep_search",
+                "query": f"{brand_name} 2024 2025 活动 campaign event",
+            }
+        )
+
+    if injected:
+        print(f"   🧠 Strategy layer injected {len(injected)} smart actions")
+        for inj in injected:
+            print(
+                f"      → {inj['action']}: {inj['dimension']} ({inj.get('target_type', inj.get('query', '')[:30])})"
+            )
+
+    return gaps + injected
 
 
 def run_agent_pipeline(
@@ -139,6 +226,8 @@ def run_agent_pipeline(
             break
 
         print(f"\n🔧 Filling {len(gaps)} gaps...")
+        # Strategy layer: auto-inject explore/deep_search when LLM fails to
+        gaps = _inject_strategy_actions(gaps, scores, round_num, actual_brand_name, url)
         new_pages = 0
         new_searches = 0
 
