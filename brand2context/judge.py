@@ -71,23 +71,26 @@ def judge_completeness(
 - vitality: 品牌活力（最新动态、产品发布、增长信号）
 - campaigns: 品牌活动（进行中/近期/即将到来的活动 — 每条必须有来源 URL）
 
-输出严格的 JSON，格式如下：
+  输出严格的 JSON，格式如下：
 {{
   "scores": {{"identity": 8, "offerings": 3, ...所有11个维度}},
   "overall_score": 6.5,
   "gaps": [
     {{"dimension": "offerings", "missing": "缺少具体产品列表和价格信息", "action": "search", "query": "{brand_name} TOP产品 价格"}},
     {{"dimension": "offerings", "missing": "官网产品页未抓取", "action": "crawl", "target": "/products"}},
-    {{"dimension": "trust", "missing": "缺少合作伙伴和投资方信息", "action": "search", "query": "{brand_name} 合作伙伴 投资方"}},
+    {{"dimension": "trust", "missing": "缺少合作伙伴和投资方信息", "action": "deep_search", "query": "{brand_name} partners investors"}},
+    {{"dimension": "vitality", "missing": "缺少最新动态", "action": "explore", "target_type": "news"}},
     ...更多gap
   ],
   "is_sufficient": false
 }}
 
 注意：
-- action 只有两种: "search"（搜索补充）或 "crawl"（抓取指定页面）
-- search 的 query 必须是具体可执行的搜索词
-- crawl 的 target 是 URL 路径（如 /products）或完整 URL
+- action 有四种: "search"（单引擎搜索）、"deep_search"（双引擎搜索+自动抓取）、"crawl"（抓取指定已知路径）、"explore"（主动探索官网结构）
+- search: 当需要外部信息补充时使用，query 必须是具体可执行的搜索词
+- deep_search: 同时用 metaso + tavily 双引擎搜索，适用于搜索过但结果不够的情况；搜索结果中有具体URL时会自动抓取页面完整内容
+- crawl: 当需要抓取特定已知路径时使用，target 是 URL 路径（如 /products）或完整 URL
+- explore: 当某维度完全空缺且官网可能有对应页面时使用，target_type 可以是: products, news, about, partners, faq, blog
 - overall_score >= 7 且 核心5维度(identity, offerings, differentiation, trust, access)都 >= 5 才算 is_sufficient: true
 - gaps 数组最多 8 条（优先补最重要的缺口）"""
 

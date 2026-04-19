@@ -9,6 +9,7 @@ import xml.etree.ElementTree as ET
 import requests
 from urllib.parse import urljoin, urlparse
 from .config import LINK2CONTEXT_BASE, MAX_CRAWL_PAGES
+from .llm import chat_json
 
 HIGH_VALUE_KEYWORDS = [
     "about",
@@ -158,6 +159,7 @@ def _convert_page(url: str, force_dynamic: bool = False) -> dict | None:
     2. If content < 200 chars → auto-retry with use_dynamic=True (Playwright)
     3. If that also fails → fall back to local Playwright
     """
+
     def _call_l2c(use_dynamic: bool = False) -> dict | None:
         resp = requests.post(
             f"{LINK2CONTEXT_BASE}/api/convert",
@@ -185,9 +187,7 @@ def _convert_page(url: str, force_dynamic: bool = False) -> dict | None:
             )
             dynamic_result = _call_l2c(use_dynamic=True)
             if dynamic_result and len(dynamic_result["content"]) >= 200:
-                print(
-                    f"   ✅ Dynamic parse got {len(dynamic_result['content'])} chars"
-                )
+                print(f"   ✅ Dynamic parse got {len(dynamic_result['content'])} chars")
                 return dynamic_result
 
         # Step 3: if still nothing useful, try local Playwright as last resort
@@ -452,3 +452,97 @@ def _extract_internal_links(base_url: str, markdown_content: str) -> list[str]:
             internal_links.append(clean_url)
 
     return internal_links
+
+
+STATIC_EXTENSIONS = frozenset(
+    ".css .js .png .jpg .jpeg .gif .svg .ico .woff .woff2 .ttf .eot .webp .pdf .zip .tar .gz .mp4 .mp3 .wav".split()
+)
+
+
+def _is_static_url(url: str) -> bool:
+    parsed = urlparse(url)
+    path = parsed.path.lower()
+    return any(path.endswith(ext) for ext in STATIC_EXTENSIONS)
+
+
+def explore_site(url: str, target_type: str = "products") -> list[dict]:
+    """Explore website structure to discover high-value pages.
+
+    1. Use dynamic mode to fetch homepage and extract all internal links
+    2. Use LLM to analyze links and pick the most relevant URLs for target_type
+    3. Crawl each selected page with dynamic mode
+    4. Return the list of crawled pages
+    """
+    print(f"   🧭 Exploring {url} for {target_type}...")
+
+    homepage = _convert_page(url, force_dynamic=True)
+    if not homepage or len(homepage.get("content", "")) < 50:
+        print(f"   ⚠️ Failed to fetch homepage for exploration")
+        return []
+
+    links = _extract_internal_links(url, homepage["content"])
+    links = [l for l in links if not _is_static_url(l)]
+
+    if not links:
+        print(f"   ⚠️ No internal links found on homepage")
+        return []
+
+    print(f"   🔗 Found {len(links)} internal links, using LLM to select best ones...")
+
+    links_json = json.dumps(links[:50], ensure_ascii=False)
+
+    analysis_prompt = f"""Given a brand website and a target content type, select the most promising URLs to check.
+
+Brand URL: {url}
+Target content type: {target_type}
+
+Available internal URLs (first 50):
+{links_json}
+
+Please select the top 5-10 URLs most likely to contain "{target_type}" content.
+
+Return a JSON array of URL strings (max 10 items):
+["https://example.com/products", "https://example.com/shop", ...]"""
+
+    result = chat_json(
+        analysis_prompt,
+        system="你是一个网站结构分析专家。从给定URL列表中，选出最可能包含目标内容的页面。输出严格JSON数组。",
+        max_tokens=1500,
+    )
+
+    selected = []
+    if isinstance(result, list):
+        selected = [u for u in result if isinstance(u, str) and u.startswith("http")]
+    elif isinstance(result, dict) and "urls" in result:
+        selected = [
+            u for u in result["urls"] if isinstance(u, str) and u.startswith("http")
+        ]
+
+    if not selected:
+        print(
+            f"   ⚠️ LLM didn't return usable URLs, falling back to keyword matching..."
+        )
+        keywords_map = {
+            "products": ["product", "shop", "catalog", "offering"],
+            "news": ["news", "press", "blog", "announcement", "更新"],
+            "about": ["about", "story", "team", "company", "我们"],
+            "partners": ["partner", "investor", "合作"],
+            "faq": ["faq", "question", "help", "support"],
+            "blog": ["blog"],
+        }
+        kws = keywords_map.get(target_type, [target_type])
+        selected = [l for l in links if any(kw in l.lower() for kw in kws)][:10]
+
+    print(f"   🎯 Selected {len(selected)} URLs to crawl")
+
+    pages = []
+    for u in selected[:10]:
+        page = _convert_page(u, force_dynamic=True)
+        if page and len(page.get("content", "")) > 100:
+            pages.append(page)
+            print(
+                f"      ✅ {page.get('title', u)[:40]} ({len(page['content'])} chars)"
+            )
+
+    print(f"   📊 Explored {len(pages)} pages from {len(selected)} selected URLs")
+    return pages

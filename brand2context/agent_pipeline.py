@@ -8,7 +8,13 @@ from urllib.parse import urljoin, urlparse
 
 from .raw_store import RawStore
 from .judge import judge_completeness
-from .crawler import crawl_site, _convert_page, _parse_sitemap, _score_page
+from .crawler import (
+    crawl_site,
+    _convert_page,
+    _parse_sitemap,
+    _score_page,
+    explore_site,
+)
 from .web_searcher import search_expand, _search_metaso, _search_tavily, _is_china_brand
 from .clue_extractor import extract_clues
 from .structurer import (
@@ -174,7 +180,7 @@ def run_agent_pipeline(
                     crawl_url = urljoin(url, "/" + target)
 
                 print(f"   🕷️ Crawl: {crawl_url} (for {dimension})")
-                page = _convert_page(crawl_url)
+                page = _convert_page(crawl_url, force_dynamic=True)
                 if page and len(page.get("content", "")) > 100:
                     store.add_page(
                         page["url"],
@@ -186,6 +192,65 @@ def run_agent_pipeline(
                     print(f"      ✅ {len(page['content'])} chars stored")
                 else:
                     print(f"      ⚠️ Crawl failed or empty")
+
+            elif action == "explore":
+                target_type = gap.get("target_type", "products")
+                print(f"   🧭 Explore: {url} for {target_type} (for {dimension})")
+                pages = explore_site(url, target_type)
+                for page in pages:
+                    store.add_page(
+                        page["url"],
+                        page.get("title", ""),
+                        page["content"],
+                        source="gap_fill_explore",
+                    )
+                    new_pages += 1
+                if pages:
+                    print(f"      ✅ {len(pages)} pages stored")
+                else:
+                    print(f"      ⚠️ No pages found")
+
+            elif action == "deep_search":
+                query = gap.get("query", "")
+                if not query:
+                    continue
+                print(f'   🔍 Deep Search: "{query}" (for {dimension})')
+                metaso_results = _search_metaso(query, size=5)
+                tavily_results = _search_tavily(query, max_results=5)
+
+                all_results = []
+                if metaso_results.get("results"):
+                    all_results.extend(metaso_results["results"])
+                if tavily_results.get("results"):
+                    all_results.extend(tavily_results["results"])
+
+                if all_results:
+                    store.add_search_result(
+                        query,
+                        all_results,
+                        source="deep_search",
+                        answer=metaso_results.get("answer", "")
+                        or tavily_results.get("answer", ""),
+                    )
+                    new_searches += 1
+                    print(f"      ✅ {len(all_results)} combined results stored")
+
+                    for r in all_results[:5]:
+                        r_url = r.get("url", "")
+                        if r_url and r_url.startswith("http"):
+                            page = _convert_page(r_url, force_dynamic=True)
+                            if page and len(page.get("content", "")) > 100:
+                                store.add_page(
+                                    page["url"],
+                                    page.get("title", ""),
+                                    page["content"],
+                                    source="deep_search_crawl",
+                                )
+                                new_pages += 1
+                    if new_pages > 0:
+                        print(f"      ✅ Auto-crawled {new_pages} result pages")
+                else:
+                    print(f"      ⚠️ No results")
 
         store.update_manifest(
             round_num,
