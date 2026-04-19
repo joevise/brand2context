@@ -169,6 +169,12 @@ def _extract_dimension(
 
 Generate the {dimension} JSON now:"""
 
+    if dimension == "vitality":
+        prompt += '\n\nIMPORTANT: Output a FLAT JSON object with the field values directly. Do NOT output the schema structure (no "type", "properties" keys). Example:\n{"schema_version": "0.4.0", "content_frequency": "每周更新", "last_product_launch": "2024-09 新品系列", "growth_signal": "...", "market_position": "..."}'
+
+    if dimension == "campaigns":
+        prompt += '\n\nIMPORTANT: Output arrays of campaign objects with specific details. Each campaign must have name, type, date/start_date, summary, source_url. Example:\n{"schema_version": "0.4.0", "ongoing": [], "recent": [{"name": "品牌x联名系列", "type": "联名营销", "date": "2024-09-01", "summary": "...", "source_url": "https://..."}], "upcoming": [], "annual_events": []}'
+
     try:
         result = chat_json(
             prompt,
@@ -217,6 +223,16 @@ def _normalize_result(result: dict) -> dict:
             elif field not in camp:
                 camp[field] = []
         result["campaigns"] = camp
+
+    vit = result.get("vitality", {})
+    if isinstance(vit, dict) and "properties" in vit:
+        fixed_vit = {"schema_version": "0.4.0"}
+        for field, field_def in vit["properties"].items():
+            if isinstance(field_def, dict):
+                fixed_vit[field] = field_def.get("value", field_def.get("default", ""))
+            else:
+                fixed_vit[field] = field_def
+        result["vitality"] = fixed_vit
 
     return result
 

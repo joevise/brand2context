@@ -102,16 +102,28 @@ def _inject_strategy_actions(
         )
 
     # campaigns: if score < 5 and round >= 2
-    if (
-        scores.get("campaigns", 10) < 5
-        and round_num >= 2
-    ):
+    if scores.get("campaigns", 10) < 5 and round_num >= 2:
         injected.append(
             {
                 "dimension": "campaigns",
                 "missing": "auto: deep search campaigns",
                 "action": "deep_search",
-                "query": f"{brand_name} 2024 2025 活动 campaign event 新品发布",
+                "query": f"{brand_name} 最新活动 2024 联名 新品发布 线下活动",
+            }
+        )
+
+    # campaigns: extra explore for news when round >= 3
+    if (
+        scores.get("campaigns", 10) < 5
+        and round_num >= 3
+        and "campaigns" not in existing_dims_with_explore
+    ):
+        injected.append(
+            {
+                "dimension": "campaigns",
+                "missing": "auto: explore news for campaigns",
+                "action": "explore",
+                "target_type": "news",
             }
         )
 
@@ -122,7 +134,9 @@ def _inject_strategy_actions(
                 f"      -> {inj['action']}: {inj['dimension']} ({inj.get('target_type', inj.get('query', '')[:30])})"
             )
     else:
-        print(f"   [STRATEGY] No injection needed (scores: {dict(list(scores.items())[:5])}...)")
+        print(
+            f"   [STRATEGY] No injection needed (scores: {dict(list(scores.items())[:5])}...)"
+        )
 
     # Put injected actions FIRST so they execute before the original search-only gaps
     return injected + gaps
