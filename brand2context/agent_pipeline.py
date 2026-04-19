@@ -103,12 +103,18 @@ def _inject_strategy_actions(
 
     # campaigns: if score < 5 and round >= 2
     if scores.get("campaigns", 10) < 5 and round_num >= 2:
+        # Adapt query to brand language
+        is_china = any(c >= '\u4e00' and c <= '\u9fff' for c in brand_name)
+        if is_china:
+            camp_query = f"{brand_name} 最新活动 2024 2025 联名 新品发布 线下活动"
+        else:
+            camp_query = f"{brand_name} latest campaign 2024 2025 collaboration launch event"
         injected.append(
             {
                 "dimension": "campaigns",
                 "missing": "auto: deep search campaigns",
                 "action": "deep_search",
-                "query": f"{brand_name} 最新活动 2024 联名 新品发布 线下活动",
+                "query": camp_query,
             }
         )
 
@@ -124,6 +130,22 @@ def _inject_strategy_actions(
                 "missing": "auto: explore news for campaigns",
                 "action": "explore",
                 "target_type": "news",
+            }
+        )
+
+    # vitality: deep search for growth signals, product launches
+    if scores.get("vitality", 10) < 5 and round_num >= 2:
+        is_china = any(c >= '\u4e00' and c <= '\u9fff' for c in brand_name)
+        if is_china:
+            vit_query = f"{brand_name} 最新动态 新品发布 2024 2025 增长 市场份额"
+        else:
+            vit_query = f"{brand_name} latest news 2024 2025 product launch growth market share"
+        injected.append(
+            {
+                "dimension": "vitality",
+                "missing": "auto: deep search vitality",
+                "action": "deep_search",
+                "query": vit_query,
             }
         )
 
