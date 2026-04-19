@@ -41,8 +41,9 @@ def _inject_strategy_actions(
 
     injected = []
 
+    # offerings: if score < 5 (on 0-10 scale) and round >= 2
     if (
-        scores.get("offerings", 10) < 3
+        scores.get("offerings", 10) < 5
         and round_num >= 2
         and "offerings" not in existing_dims_with_explore
     ):
@@ -55,8 +56,9 @@ def _inject_strategy_actions(
             }
         )
 
+    # content: if score < 5 and round >= 2
     if (
-        scores.get("content", 10) < 3
+        scores.get("content", 10) < 5
         and round_num >= 2
         and "content" not in existing_dims_with_explore
     ):
@@ -69,9 +71,10 @@ def _inject_strategy_actions(
             }
         )
 
+    # trust: if score < 5 and round >= 2
     if (
-        scores.get("trust", 10) < 3
-        and round_num >= 3
+        scores.get("trust", 10) < 5
+        and round_num >= 2
         and "deep_search" not in existing_actions
     ):
         injected.append(
@@ -83,7 +86,12 @@ def _inject_strategy_actions(
             }
         )
 
-    if scores.get("experience", 10) < 3 and round_num >= 3:
+    # experience: if score < 5 and round >= 2
+    if (
+        scores.get("experience", 10) < 5
+        and round_num >= 2
+        and "experience" not in existing_dims_with_explore
+    ):
         injected.append(
             {
                 "dimension": "experience",
@@ -93,28 +101,31 @@ def _inject_strategy_actions(
             }
         )
 
+    # campaigns: if score < 5 and round >= 2
     if (
-        scores.get("campaigns", 10) < 3
-        and round_num >= 3
-        and "deep_search" not in existing_actions
+        scores.get("campaigns", 10) < 5
+        and round_num >= 2
     ):
         injected.append(
             {
                 "dimension": "campaigns",
                 "missing": "auto: deep search campaigns",
                 "action": "deep_search",
-                "query": f"{brand_name} 2024 2025 活动 campaign event",
+                "query": f"{brand_name} 2024 2025 活动 campaign event 新品发布",
             }
         )
 
     if injected:
-        print(f"   🧠 Strategy layer injected {len(injected)} smart actions")
+        print(f"   [STRATEGY] Injected {len(injected)} smart actions:")
         for inj in injected:
             print(
-                f"      → {inj['action']}: {inj['dimension']} ({inj.get('target_type', inj.get('query', '')[:30])})"
+                f"      -> {inj['action']}: {inj['dimension']} ({inj.get('target_type', inj.get('query', '')[:30])})"
             )
+    else:
+        print(f"   [STRATEGY] No injection needed (scores: {dict(list(scores.items())[:5])}...)")
 
-    return gaps + injected
+    # Put injected actions FIRST so they execute before the original search-only gaps
+    return injected + gaps
 
 
 def run_agent_pipeline(
