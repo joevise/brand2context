@@ -225,13 +225,13 @@ def run_agent_pipeline(
             print(f"⏹ Max rounds reached, proceeding with available data")
             break
 
-        print(f"\n🔧 Filling {len(gaps)} gaps...")
         # Strategy layer: auto-inject explore/deep_search when LLM fails to
         gaps = _inject_strategy_actions(gaps, scores, round_num, actual_brand_name, url)
+        print(f"\n🔧 Filling {len(gaps)} gaps...")
         new_pages = 0
         new_searches = 0
 
-        for gap in gaps[:8]:
+        for gap in gaps[:12]:
             action = gap.get("action", "")
             dimension = gap.get("dimension", "")
 
