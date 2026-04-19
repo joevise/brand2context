@@ -150,13 +150,19 @@ asyncio.run(main())
     return None
 
 
-def _convert_page(url: str) -> dict | None:
-    """Convert a single page via link2context API with Playwright fallback."""
-    try:
+def _convert_page(url: str, force_dynamic: bool = False) -> dict | None:
+    """Convert a single page via link2context API.
+
+    Strategy (smart agent approach):
+    1. First try static parse (fast, low resource)
+    2. If content < 200 chars → auto-retry with use_dynamic=True (Playwright)
+    3. If that also fails → fall back to local Playwright
+    """
+    def _call_l2c(use_dynamic: bool = False) -> dict | None:
         resp = requests.post(
             f"{LINK2CONTEXT_BASE}/api/convert",
-            json={"url": url},
-            timeout=60,
+            json={"url": url, "use_dynamic": use_dynamic},
+            timeout=120 if use_dynamic else 60,
         )
         resp.raise_for_status()
         data = resp.json()
@@ -164,16 +170,36 @@ def _convert_page(url: str) -> dict | None:
             return None
         content = data.get("markdown", "")
         title = data.get("title", url)
+        if not content:
+            return None
+        return {"url": url, "title": title, "content": content}
 
-        if len(content) < 200:
+    try:
+        # Step 1: static (or forced dynamic)
+        result = _call_l2c(use_dynamic=force_dynamic)
+
+        # Step 2: if static returned too little, auto-escalate to dynamic
+        if result and len(result["content"]) < 200 and not force_dynamic:
             print(
-                f"   ⚠️ link2context returned too little content for {url}, trying Playwright..."
+                f"   ⚠️ Static parse too thin ({len(result['content'])} chars), escalating to dynamic..."
+            )
+            dynamic_result = _call_l2c(use_dynamic=True)
+            if dynamic_result and len(dynamic_result["content"]) >= 200:
+                print(
+                    f"   ✅ Dynamic parse got {len(dynamic_result['content'])} chars"
+                )
+                return dynamic_result
+
+        # Step 3: if still nothing useful, try local Playwright as last resort
+        if not result or len(result["content"]) < 200:
+            print(
+                f"   ⚠️ link2context insufficient, trying local Playwright fallback..."
             )
             pw_result = _convert_page_playwright(url)
             if pw_result:
                 return pw_result
 
-        return {"url": url, "title": title, "content": content}
+        return result
     except Exception:
         print(f"   ⚠️ link2context failed, trying Playwright...")
         return _convert_page_playwright(url)
