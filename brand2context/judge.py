@@ -85,14 +85,15 @@ def judge_completeness(
   "is_sufficient": false
 }}
 
-注意：
-- action 有四种: "search"（单引擎搜索）、"deep_search"（双引擎搜索+自动抓取）、"crawl"（抓取指定已知路径）、"explore"（主动探索官网结构）
-- search: 当需要外部信息补充时使用，query 必须是具体可执行的搜索词
-- deep_search: 同时用 metaso + tavily 双引擎搜索，适用于搜索过但结果不够的情况；搜索结果中有具体URL时会自动抓取页面完整内容
-- crawl: 当需要抓取特定已知路径时使用，target 是 URL 路径（如 /products）或完整 URL
-- explore: 当某维度完全空缺且官网可能有对应页面时使用，target_type 可以是: products, news, about, partners, faq, blog
-- overall_score >= 7 且 核心5维度(identity, offerings, differentiation, trust, access)都 >= 5 才算 is_sufficient: true
-- gaps 数组最多 8 条（优先补最重要的缺口）"""
+  注意：
+  - action 有四种: "search"（单引擎搜索）、"deep_search"（双引擎搜索+自动抓取）、"crawl"（抓取指定已知路径）、"explore"（主动探索官网结构）
+  - search: 当需要外部信息补充时使用，query 必须是具体可执行的搜索词
+  - deep_search: 同时用 metaso + tavily 双引擎搜索，适用于搜索过但结果不够的情况；搜索结果中有具体URL时会自动抓取页面完整内容
+  - crawl: 当需要抓取特定已知路径时使用，target 是 URL 路径（如 /products）或完整 URL
+  - explore: 当某维度完全空缺且官网可能有对应页面时使用，target_type 可以是: products, news, about, partners, faq, blog
+  - overall_score >= 7 且 核心5维度(identity, offerings, differentiation, trust, access)都 >= 5 才算 is_sufficient: true
+  - gaps 数组最多 8 条（优先补最重要的缺口）
+  - 注意：experience 维度（FAQ/售后）通常很难从外部获取，如果搜索后仍为空可以给4分（可接受的空缺）"""
 
     result = chat_json(
         prompt, system="你是品牌知识库质量审查员。输出严格 JSON。", max_tokens=3000

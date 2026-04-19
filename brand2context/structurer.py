@@ -181,6 +181,46 @@ Generate the {dimension} JSON now:"""
         return {}
 
 
+def _normalize_result(result: dict) -> dict:
+    """Normalize LLM output to ensure consistent structure."""
+    off = result.get("offerings", {})
+    if isinstance(off, dict):
+        if "name" in off and "offerings" not in off and "items" not in off:
+            result["offerings"] = {"schema_version": "0.4.0", "items": [off]}
+        elif "offerings" in off:
+            items = off["offerings"]
+            if isinstance(items, dict):
+                items = [items]
+            result["offerings"] = {"schema_version": "0.4.0", "items": items}
+        elif "items" in off:
+            items = off["items"]
+            if isinstance(items, dict):
+                items = [items]
+            result["offerings"] = {"schema_version": "0.4.0", "items": items}
+    elif isinstance(off, list):
+        result["offerings"] = {"schema_version": "0.4.0", "items": off}
+
+    content = result.get("content", {})
+    if isinstance(content, dict):
+        for field in ["latest_news", "blog_posts", "key_announcements"]:
+            if field in content and isinstance(content[field], dict):
+                content[field] = [content[field]]
+            elif field not in content:
+                content[field] = []
+        result["content"] = content
+
+    camp = result.get("campaigns", {})
+    if isinstance(camp, dict):
+        for field in ["ongoing", "recent", "upcoming", "annual_events"]:
+            if field in camp and isinstance(camp[field], dict):
+                camp[field] = [camp[field]]
+            elif field not in camp:
+                camp[field] = []
+        result["campaigns"] = camp
+
+    return result
+
+
 def structure_brand(
     url: str,
     pages: list[dict],
@@ -283,7 +323,7 @@ def structure_brand(
         if url not in final_result.get("source_urls", []):
             final_result.setdefault("source_urls", []).append(url)
         print("   ✅ Brand knowledge base generated (per-dimension)")
-        return final_result
+        return _normalize_result(final_result)
 
     print(
         f"   ⚠️  Per-dimension extraction incomplete ({len(dimension_results)}/11), falling back to full extraction..."
@@ -344,7 +384,7 @@ Generate the complete brand knowledge JSON now:"""
         if url not in result.get("source_urls", []):
             result.setdefault("source_urls", []).append(url)
         print("   ✅ Brand knowledge base generated (full)")
-        return result
+        return _normalize_result(result)
     except Exception as e:
         print(f"   ⚠️  Full extraction failed: {e}")
         print("   🔄 Using simplified fallback...")
@@ -384,7 +424,7 @@ Fill in as much as possible. Output ONLY valid JSON."""
             result["generated_at"] = datetime.now(timezone.utc).isoformat()
             result.setdefault("source_urls", [url])
             print("   ✅ Fallback succeeded")
-            return result
+            return _normalize_result(result)
         except Exception as e2:
             print(f"   ❌ Fallback also failed: {e2}")
             raise e
@@ -549,4 +589,4 @@ def structure_brand_incremental(
         final_result.setdefault("source_urls", []).append(url)
 
     print("   ✅ Incremental brand knowledge base generated")
-    return final_result
+    return _normalize_result(final_result)
