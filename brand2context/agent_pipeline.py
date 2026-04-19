@@ -104,11 +104,13 @@ def _inject_strategy_actions(
     # campaigns: if score < 5 and round >= 2
     if scores.get("campaigns", 10) < 5 and round_num >= 2:
         # Adapt query to brand language
-        is_china = any(c >= '\u4e00' and c <= '\u9fff' for c in brand_name)
+        is_china = any(c >= "\u4e00" and c <= "\u9fff" for c in brand_name)
         if is_china:
             camp_query = f"{brand_name} 最新活动 2024 2025 联名 新品发布 线下活动"
         else:
-            camp_query = f"{brand_name} latest campaign 2024 2025 collaboration launch event"
+            camp_query = (
+                f"{brand_name} latest campaign 2024 2025 collaboration launch event"
+            )
         injected.append(
             {
                 "dimension": "campaigns",
@@ -135,11 +137,13 @@ def _inject_strategy_actions(
 
     # vitality: deep search for growth signals, product launches
     if scores.get("vitality", 10) < 5 and round_num >= 2:
-        is_china = any(c >= '\u4e00' and c <= '\u9fff' for c in brand_name)
+        is_china = any(c >= "\u4e00" and c <= "\u9fff" for c in brand_name)
         if is_china:
             vit_query = f"{brand_name} 最新动态 新品发布 2024 2025 增长 市场份额"
         else:
-            vit_query = f"{brand_name} latest news 2024 2025 product launch growth market share"
+            vit_query = (
+                f"{brand_name} latest news 2024 2025 product launch growth market share"
+            )
         injected.append(
             {
                 "dimension": "vitality",
@@ -233,6 +237,25 @@ def run_agent_pipeline(
 
     store.update_manifest(1, "initial_crawl", pages_added, searches_added)
     print(f"📊 Round 1 complete: {pages_added} pages, {searches_added} searches stored")
+
+    # ========== Social Media Public Search ==========
+    print(f"\n{'=' * 50}")
+    print(f"📱 Social Media Public Search")
+    print(f"{'=' * 50}")
+
+    from .social_public import search_social_public
+
+    social_search_results = search_social_public(actual_brand_name, url)
+    social_added = 0
+    for sr in social_search_results:
+        store.add_search_result(
+            sr["query"],
+            sr.get("results", []),
+            source=sr.get("source", "social_metaso"),
+            answer=sr.get("answer", ""),
+        )
+        social_added += 1
+    print(f"📊 Social search complete: {social_added} search groups stored")
 
     # ========== Rounds 2-N: Judge + Fill Loop ==========
     prev_data_count = pages_added + searches_added
