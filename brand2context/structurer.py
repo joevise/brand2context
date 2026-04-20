@@ -174,36 +174,15 @@ def _extract_dimension(
 
 请直接输出填充后的JSON（不要包含任何解释）："""
 
-    # 每个维度加具体例子，引导LLM正确输出
+    # 每个维度加简短例子引导格式
     DIMENSION_EXAMPLES = {
-        "offerings": """
-## 输出示例（列出具体产品/产品线，不要把品牌名作为产品名，至少列出5-10个主要产品）：
-{"items": [
-  {"name": "iPhone 16 Pro", "category": "智能手机", "description": "旗舰智能手机", "key_features": ["A18 Pro芯片", "钛合金边框"], "specs": [{"key": "芯片", "value": "A18 Pro"}], "price_range": "¥7,999-¥13,999", "currency": "CNY", "target_audience": "高端消费者", "use_cases": ["日常通讯", "摄影"], "is_flagship": true, "status": "active"},
-  {"name": "MacBook Air M3", "category": "笔记本电脑", "description": "轻薄笔记本", "key_features": ["M3芯片"], "price_range": "¥8,999-¥12,499", "currency": "CNY", "target_audience": "学生/专业人士", "use_cases": ["办公"], "is_flagship": false, "status": "active"},
-  {"name": "AirPods Pro 2", "category": "耳机", "description": "主动降噪耳机", "key_features": ["H2芯片", "自适应降噪"], "price_range": "¥1,899", "currency": "CNY", "target_audience": "音乐爱好者", "use_cases": ["音乐", "通话"], "is_flagship": false, "status": "active"},
-  {"name": "iPad Air", "category": "平板电脑", "description": "轻薄平板", "key_features": ["M2芯片"], "price_range": "¥4,799起", "currency": "CNY", "target_audience": "学生/创作者", "use_cases": ["学习", "绘画"], "is_flagship": false, "status": "active"},
-  {"name": "Apple Watch Ultra 2", "category": "智能手表", "description": "运动旗舰手表", "key_features": ["钛合金表壳", "双频GPS"], "price_range": "¥6,499", "currency": "CNY", "target_audience": "运动爱好者", "use_cases": ["运动追踪", "户外"], "is_flagship": true, "status": "active"}
-]}
-注意：name 必须是具体产品名（如"iPhone 16 Pro"），不能是品牌名。每个产品要有 price_range。尽可能多列产品（至少5个）。""",
-        "decision_factors": """
-## 输出示例：
-{"category_key_factors": [{"factor": "产品质量", "brand_score": "9/10", "evidence": "采用高品质阿拉比卡咖啡豆"}, {"factor": "价格", "brand_score": "6/10", "evidence": "中杯拿铁38元，高于行业平均"}], "perceived_risks": [{"risk": "价格偏高", "mitigation": "会员体系提供折扣和积分"}], "switching_cost": "较低，但品牌忠诚度较高", "trial_barrier": "门店覆盖广，试错成本低"}""",
-        "trust": """
-## 输出示例：
-{"certifications": ["ISO 9001", "B Corp认证"], "partnerships": ["与VF Corporation合作", "AMGA钻石合作伙伴"], "media_coverage": [{"outlet": "36氪", "title": "品牌获得新一轮融资", "date": "2024-06", "url": "https://..."}], "investor_backed": "VF Corporation（纽约证券交易所上市）", "user_stats": [{"metric": "全球门店", "value": "200+"}], "testimonials": [{"source": "行业专家", "quote": "该品牌在户外领域有标杆地位"}]}""",
-        "experience": """
-## 输出示例：
-{"warranty": "产品提供一年质保", "return_policy": "30天无理由退换", "customer_service": {"channels": ["在线客服", "400电话", "门店"], "hours": "9:00-18:00"}, "faq": [{"question": "如何清洗冲锋衣？", "answer": "使用中性清洁剂手洗"}], "onboarding": "新用户注册即送会员积分", "community": "品牌社区活动、线下探索活动"}""",
-        "vitality": """
-## 输出示例（扁平JSON，不要type/properties）：
-{"content_frequency": "每周2-3次社交媒体更新", "last_product_launch": "2024年9月 TNFH秋冬系列", "last_campaign": "2024年4月 天猫超级品牌日「山地节」", "growth_signal": "全球户外市场持续增长，品牌通过联名扩大潮流影响力", "community_size": "微博粉丝50万+", "nps_or_satisfaction": "[推断]用户评价普遍正面", "market_position": "全球TOP3户外品牌", "industry_role": "leader"}""",
-        "campaigns": """
-## 输出示例：
-{"ongoing": [{"name": "Clothes the Loop", "type": "环保回收项目", "description": "鼓励消费者回收旧衣物", "start_date": "2013年"}], "recent": [{"name": "Supreme x TNF 2024联名", "type": "品牌联名", "date": "2024-03", "summary": "与Supreme推出春季联名系列", "source_url": "https://..."}], "upcoming": [], "annual_events": [{"name": "山地节", "frequency": "年度", "typical_month": "4月", "description": "天猫超级品牌日户外活动"}]}""",
-        "content": """
-## 输出示例：
-{"latest_news": [{"title": "品牌宣布全面禁用皮草", "date": "2024-09", "summary": "VF集团宣布旗下所有品牌停止使用皮草和安哥拉山羊毛", "url": "https://...", "source_url": "https://..."}], "blog_posts": [{"title": "TNF vs Arc'teryx对比指南", "date": "2024-01", "summary": "两大户外品牌深度对比", "url": "https://..."}], "key_announcements": [], "brand_guidelines_public": ""}""",
+        "offerings": '\n注意：name必须是具体产品名（不能是品牌名），每个产品要有price_range。至少列5个主要产品。示例item: {"name": "Air Max 90", "category": "运动鞋", "price_range": "¥899-¥1,299", ...}',
+        "decision_factors": '\n注意：category_key_factors 必须是对象数组，每个对象有 factor/brand_score/evidence 字段。示例: [{"factor": "产品质量", "brand_score": "9/10", "evidence": "采用高品质材料"}]',
+        "trust": '\n注意：certifications/partnerships 填字符串数组，media_coverage 填对象数组（含outlet/title/date）。尽量多填。',
+        "experience": '\n注意：warranty/return_policy/onboarding/community 都要填写。customer_service 要有 channels 数组。',
+        "vitality": '\n注意：输出扁平JSON，直接填字段值。last_product_launch 和 last_campaign 要填具体产品/活动名称和日期。',
+        "campaigns": '\n注意：ongoing/recent 数组里每个活动要有 name/type/date/summary。至少填2-3个近期活动。',
+        "content": '\n注意：latest_news 数组里每条要有 title/date/summary/url。blog_posts 同理。',
     }
 
     if dimension in DIMENSION_EXAMPLES:
