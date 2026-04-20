@@ -174,16 +174,34 @@ def _extract_dimension(
 
 请直接输出填充后的JSON（不要包含任何解释）："""
 
-    if dimension == "vitality":
-        prompt += "\n\n注意：输出扁平JSON对象，直接填字段值。不要输出schema结构。"
-    if dimension == "campaigns":
-        prompt += "\n\n注意：每个活动对象需要name, type, date/start_date, summary, source_url字段。"
+    # 每个维度加具体例子，引导LLM正确输出
+    DIMENSION_EXAMPLES = {
+        "trust": """
+## 输出示例：
+{"certifications": ["ISO 9001", "B Corp认证"], "partnerships": ["与VF Corporation合作", "AMGA钻石合作伙伴"], "media_coverage": [{"outlet": "36氪", "title": "品牌获得新一轮融资", "date": "2024-06", "url": "https://..."}], "investor_backed": "VF Corporation（纽约证券交易所上市）", "user_stats": [{"metric": "全球门店", "value": "200+"}], "testimonials": [{"source": "行业专家", "quote": "该品牌在户外领域有标杆地位"}]}""",
+        "experience": """
+## 输出示例：
+{"warranty": "产品提供一年质保", "return_policy": "30天无理由退换", "customer_service": {"channels": ["在线客服", "400电话", "门店"], "hours": "9:00-18:00"}, "faq": [{"question": "如何清洗冲锋衣？", "answer": "使用中性清洁剂手洗"}], "onboarding": "新用户注册即送会员积分", "community": "品牌社区活动、线下探索活动"}""",
+        "vitality": """
+## 输出示例（扁平JSON，不要type/properties）：
+{"content_frequency": "每周2-3次社交媒体更新", "last_product_launch": "2024年9月 TNFH秋冬系列", "last_campaign": "2024年4月 天猫超级品牌日「山地节」", "growth_signal": "全球户外市场持续增长，品牌通过联名扩大潮流影响力", "community_size": "微博粉丝50万+", "nps_or_satisfaction": "[推断]用户评价普遍正面", "market_position": "全球TOP3户外品牌", "industry_role": "leader"}""",
+        "campaigns": """
+## 输出示例：
+{"ongoing": [{"name": "Clothes the Loop", "type": "环保回收项目", "description": "鼓励消费者回收旧衣物", "start_date": "2013年"}], "recent": [{"name": "Supreme x TNF 2024联名", "type": "品牌联名", "date": "2024-03", "summary": "与Supreme推出春季联名系列", "source_url": "https://..."}], "upcoming": [], "annual_events": [{"name": "山地节", "frequency": "年度", "typical_month": "4月", "description": "天猫超级品牌日户外活动"}]}""",
+        "content": """
+## 输出示例：
+{"latest_news": [{"title": "品牌宣布全面禁用皮草", "date": "2024-09", "summary": "VF集团宣布旗下所有品牌停止使用皮草和安哥拉山羊毛", "url": "https://...", "source_url": "https://..."}], "blog_posts": [{"title": "TNF vs Arc'teryx对比指南", "date": "2024-01", "summary": "两大户外品牌深度对比", "url": "https://..."}], "key_announcements": [], "brand_guidelines_public": ""}""",
+    }
+    
+    if dimension in DIMENSION_EXAMPLES:
+        prompt += DIMENSION_EXAMPLES[dimension]
 
     try:
         result = chat_json(
             prompt,
             system="你是品牌信息提取专家。按模板结构输出JSON。尽可能从上下文中提取信息填写每个字段，多填比少填好。不确定的信息加[推断]前缀。",
             max_tokens=4000,
+            temperature=0.2,
         )
         result = validate_and_fix(dimension, result)
         return result

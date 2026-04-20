@@ -141,7 +141,7 @@ def chat(prompt: str, system: str = "", max_tokens: int = 16000, temperature: fl
     raise last_err
 
 
-def chat_json(prompt: str, system: str = "", max_tokens: int = 16000) -> dict:
+def chat_json(prompt: str, system: str = "", max_tokens: int = 16000, temperature: float = 0.2) -> dict:
     """Call LLM and parse JSON from the response using production-grade repair."""
-    text = chat(prompt, system, max_tokens)
+    text = chat(prompt, system, max_tokens, temperature=temperature)
     return repair_json(text)
