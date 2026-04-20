@@ -98,12 +98,15 @@ def _select_context_for_dimension(
     sr_keywords = search_keywords_map.get(dimension, [])
     for sr in search_results:
         query_lower = sr.get("query", "").lower()
-        if not sr_keywords or any(kw in query_lower for kw in sr_keywords):
+        source = sr.get("source", "")
+        # Social media search results are valuable for many dimensions — don't filter
+        is_social = "social" in source
+        if is_social or not sr_keywords or any(kw in query_lower for kw in sr_keywords):
             sr_text = f"\n--- Search: {sr['query']} ---\n"
             if sr.get("answer"):
                 sr_text += f"Answer: {sr['answer']}\n"
             for r in sr.get("results", [])[:3]:
-                sr_text += f"• {r['title']} ({r['url']}): {r['content'][:300]}\n"
+                sr_text += f"• {r.get('title','')} ({r.get('url','')}): {r.get('content','')[:300]}\n"
             context_parts.append(sr_text)
 
     if dimension in ["perception", "campaigns"] and social_results:
