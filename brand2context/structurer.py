@@ -160,7 +160,7 @@ def _extract_dimension(
 ## 规则：
 1. 保持字段名和结构不变，只填入值
 2. 尽量从上下文中提取信息填写每个字段——多填比少填好
-3. 数组字段：找到多条就填多条
+3. 数组字段：找到多条就填多条，模板里只有1个示例不代表只能填1条
 4. 如果上下文中能推断出信息，也要填写，加 [推断] 前缀
 5. 只有完全找不到相关信息时才留空
 6. 每条新闻、活动等信息尽量包含 source_url
@@ -177,12 +177,15 @@ def _extract_dimension(
     # 每个维度加具体例子，引导LLM正确输出
     DIMENSION_EXAMPLES = {
         "offerings": """
-## 输出示例（列出具体产品/产品线，不要把品牌名作为产品名）：
+## 输出示例（列出具体产品/产品线，不要把品牌名作为产品名，至少列出5-10个主要产品）：
 {"items": [
-  {"name": "iPhone 16 Pro", "category": "智能手机", "description": "旗舰智能手机，A18 Pro芯片", "key_features": ["A18 Pro芯片", "钛合金边框", "4800万像素相机"], "specs": [{"key": "芯片", "value": "A18 Pro"}], "price_range": "¥7,999-¥13,999", "currency": "CNY", "target_audience": "高端消费者", "use_cases": ["日常通讯", "摄影", "办公"], "is_flagship": true, "status": "active", "source_url": ""},
-  {"name": "MacBook Air M3", "category": "笔记本电脑", "description": "轻薄笔记本", "key_features": ["M3芯片", "18小时续航"], "price_range": "¥8,999-¥12,499", "currency": "CNY", "target_audience": "学生/专业人士", "use_cases": ["办公", "学习"], "is_flagship": false, "status": "active"}
+  {"name": "iPhone 16 Pro", "category": "智能手机", "description": "旗舰智能手机", "key_features": ["A18 Pro芯片", "钛合金边框"], "specs": [{"key": "芯片", "value": "A18 Pro"}], "price_range": "¥7,999-¥13,999", "currency": "CNY", "target_audience": "高端消费者", "use_cases": ["日常通讯", "摄影"], "is_flagship": true, "status": "active"},
+  {"name": "MacBook Air M3", "category": "笔记本电脑", "description": "轻薄笔记本", "key_features": ["M3芯片"], "price_range": "¥8,999-¥12,499", "currency": "CNY", "target_audience": "学生/专业人士", "use_cases": ["办公"], "is_flagship": false, "status": "active"},
+  {"name": "AirPods Pro 2", "category": "耳机", "description": "主动降噪耳机", "key_features": ["H2芯片", "自适应降噪"], "price_range": "¥1,899", "currency": "CNY", "target_audience": "音乐爱好者", "use_cases": ["音乐", "通话"], "is_flagship": false, "status": "active"},
+  {"name": "iPad Air", "category": "平板电脑", "description": "轻薄平板", "key_features": ["M2芯片"], "price_range": "¥4,799起", "currency": "CNY", "target_audience": "学生/创作者", "use_cases": ["学习", "绘画"], "is_flagship": false, "status": "active"},
+  {"name": "Apple Watch Ultra 2", "category": "智能手表", "description": "运动旗舰手表", "key_features": ["钛合金表壳", "双频GPS"], "price_range": "¥6,499", "currency": "CNY", "target_audience": "运动爱好者", "use_cases": ["运动追踪", "户外"], "is_flagship": true, "status": "active"}
 ]}
-注意：name 必须是具体产品名（如"iPhone 16 Pro"），不能是品牌名（如"Apple"）。每个产品要有具体的 price_range。""",
+注意：name 必须是具体产品名（如"iPhone 16 Pro"），不能是品牌名。每个产品要有 price_range。尽可能多列产品（至少5个）。""",
         "decision_factors": """
 ## 输出示例：
 {"category_key_factors": [{"factor": "产品质量", "brand_score": "9/10", "evidence": "采用高品质阿拉比卡咖啡豆"}, {"factor": "价格", "brand_score": "6/10", "evidence": "中杯拿铁38元，高于行业平均"}], "perceived_risks": [{"risk": "价格偏高", "mitigation": "会员体系提供折扣和积分"}], "switching_cost": "较低，但品牌忠诚度较高", "trial_barrier": "门店覆盖广，试错成本低"}""",
