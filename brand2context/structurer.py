@@ -149,18 +149,19 @@ def _extract_dimension(
     template_text = json.dumps(template, ensure_ascii=False, indent=2)
     clues_text = json.dumps(clues, ensure_ascii=False, indent=2)
 
-    prompt = f"""请根据以下品牌信息，填充这个JSON模板。
+    prompt = f"""请根据以下品牌信息，填充这个JSON模板。尽可能多地从上下文中提取信息填入。
 
-## 模板（只填入值，不要改变结构）：
+## 模板（按此结构填入值）：
 {template_text}
 
 ## 规则：
-1. 不要添加、删除或重命名任何字段
-2. 数组字段：有多条数据就填多条，没有数据就留空数组 []
-3. 字符串字段：没有信息就留空字符串 ""
-4. 不要编造数据。如果不确定，加 [推断] 前缀
-5. 每条新闻、活动等信息尽量包含 source_url
-6. 用中文填写，品牌名和专有名词可保留英文
+1. 保持字段名和结构不变，只填入值
+2. 尽量从上下文中提取信息填写每个字段——多填比少填好
+3. 数组字段：找到多条就填多条
+4. 如果上下文中能推断出信息，也要填写，加 [推断] 前缀
+5. 只有完全找不到相关信息时才留空
+6. 每条新闻、活动等信息尽量包含 source_url
+7. 用中文填写，品牌名和专有名词可保留英文
 
 ## 品牌线索：
 {clues_text}
@@ -178,7 +179,7 @@ def _extract_dimension(
     try:
         result = chat_json(
             prompt,
-            system="你是品牌信息提取专家。严格按模板结构输出JSON，不要改变字段名或结构。",
+            system="你是品牌信息提取专家。按模板结构输出JSON。尽可能从上下文中提取信息填写每个字段，多填比少填好。不确定的信息加[推断]前缀。",
             max_tokens=4000,
         )
         result = validate_and_fix(dimension, result)
