@@ -19,7 +19,7 @@ DIMENSION_CONTEXT_KEYWORDS = {
         "history",
         "career",
     ],
-    "offerings": ["product", "service", "pricing", "solution", "feature", "offering"],
+    "offerings": ["product", "service", "pricing", "solution", "feature", "offering", "shop", "store", "menu", "catalog", "collection", "buy", "price"],
     "differentiation": [
         "about",
         "product",
@@ -83,9 +83,11 @@ def _select_context_for_dimension(
                 )
 
     if not context_parts and pages:
-        context_parts.append(
-            f"--- {pages[0].get('url', '')} ---\n{pages[0]['content']}\n"
-        )
+        # No URL keyword match — include ALL pages (capped) for better coverage
+        for page in pages[:5]:
+            context_parts.append(
+                f"--- {page.get('url', '')} ---\n{page['content']}\n"
+            )
 
     search_keywords_map = {
         "differentiation": ["competitive", "compare", "alternative"],
