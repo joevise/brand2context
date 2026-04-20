@@ -106,7 +106,7 @@ def _select_context_for_dimension(
             if sr.get("answer"):
                 sr_text += f"Answer: {sr['answer']}\n"
             for r in sr.get("results", [])[:3]:
-                sr_text += f"• {r.get('title','')} ({r.get('url','')}): {r.get('content','')[:300]}\n"
+                sr_text += f"• {r.get('title', '')} ({r.get('url', '')}): {r.get('content', '')[:300]}\n"
             context_parts.append(sr_text)
 
     if dimension in ["perception", "campaigns"] and social_results:
@@ -176,6 +176,16 @@ def _extract_dimension(
 
     # 每个维度加具体例子，引导LLM正确输出
     DIMENSION_EXAMPLES = {
+        "offerings": """
+## 输出示例（列出具体产品/产品线，不要把品牌名作为产品名）：
+{"items": [
+  {"name": "iPhone 16 Pro", "category": "智能手机", "description": "旗舰智能手机，A18 Pro芯片", "key_features": ["A18 Pro芯片", "钛合金边框", "4800万像素相机"], "specs": [{"key": "芯片", "value": "A18 Pro"}], "price_range": "¥7,999-¥13,999", "currency": "CNY", "target_audience": "高端消费者", "use_cases": ["日常通讯", "摄影", "办公"], "is_flagship": true, "status": "active", "source_url": ""},
+  {"name": "MacBook Air M3", "category": "笔记本电脑", "description": "轻薄笔记本", "key_features": ["M3芯片", "18小时续航"], "price_range": "¥8,999-¥12,499", "currency": "CNY", "target_audience": "学生/专业人士", "use_cases": ["办公", "学习"], "is_flagship": false, "status": "active"}
+]}
+注意：name 必须是具体产品名（如"iPhone 16 Pro"），不能是品牌名（如"Apple"）。每个产品要有具体的 price_range。""",
+        "decision_factors": """
+## 输出示例：
+{"category_key_factors": [{"factor": "产品质量", "brand_score": "9/10", "evidence": "采用高品质阿拉比卡咖啡豆"}, {"factor": "价格", "brand_score": "6/10", "evidence": "中杯拿铁38元，高于行业平均"}], "perceived_risks": [{"risk": "价格偏高", "mitigation": "会员体系提供折扣和积分"}], "switching_cost": "较低，但品牌忠诚度较高", "trial_barrier": "门店覆盖广，试错成本低"}""",
         "trust": """
 ## 输出示例：
 {"certifications": ["ISO 9001", "B Corp认证"], "partnerships": ["与VF Corporation合作", "AMGA钻石合作伙伴"], "media_coverage": [{"outlet": "36氪", "title": "品牌获得新一轮融资", "date": "2024-06", "url": "https://..."}], "investor_backed": "VF Corporation（纽约证券交易所上市）", "user_stats": [{"metric": "全球门店", "value": "200+"}], "testimonials": [{"source": "行业专家", "quote": "该品牌在户外领域有标杆地位"}]}""",
@@ -192,7 +202,7 @@ def _extract_dimension(
 ## 输出示例：
 {"latest_news": [{"title": "品牌宣布全面禁用皮草", "date": "2024-09", "summary": "VF集团宣布旗下所有品牌停止使用皮草和安哥拉山羊毛", "url": "https://...", "source_url": "https://..."}], "blog_posts": [{"title": "TNF vs Arc'teryx对比指南", "date": "2024-01", "summary": "两大户外品牌深度对比", "url": "https://..."}], "key_announcements": [], "brand_guidelines_public": ""}""",
     }
-    
+
     if dimension in DIMENSION_EXAMPLES:
         prompt += DIMENSION_EXAMPLES[dimension]
 

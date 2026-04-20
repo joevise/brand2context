@@ -186,4 +186,16 @@ def validate_and_fix(dimension: str, data: dict) -> dict:
             if news_item:
                 result["latest_news"] = [news_item]
 
+    # decision_factors: 字符串数组 → 结构化对象数组
+    if dimension == "decision_factors":
+        for field in ["category_key_factors", "perceived_risks"]:
+            items = result.get(field, [])
+            if items and isinstance(items[0], str):
+                if field == "category_key_factors":
+                    result[field] = [
+                        {"factor": s, "brand_score": "", "evidence": ""} for s in items
+                    ]
+                elif field == "perceived_risks":
+                    result[field] = [{"risk": s, "mitigation": ""} for s in items]
+
     return result

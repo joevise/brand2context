@@ -28,14 +28,50 @@ def _fetch_logo(url: str) -> str:
         if domain.startswith("www."):
             domain = domain[4:]
 
-        debounce_url = f"https://logo.debounce.com/{domain}"
+        clearbit_url = f"https://logo.clearbit.com/{domain}"
         try:
-            resp = httpx.head(debounce_url, timeout=10.0, follow_redirects=True)
+            resp = httpx.head(clearbit_url, timeout=5.0, follow_redirects=True)
             content_type = resp.headers.get("content-type", "")
             if resp.status_code == 200 and "image" in content_type:
-                logo_url = debounce_url
+                logo_url = clearbit_url
         except Exception:
             pass
+
+        if not logo_url:
+            debounce_url = f"https://logo.debounce.com/{domain}"
+            try:
+                resp = httpx.head(debounce_url, timeout=10.0, follow_redirects=True)
+                content_type = resp.headers.get("content-type", "")
+                if resp.status_code == 200 and "image" in content_type:
+                    logo_url = debounce_url
+            except Exception:
+                pass
+
+        if not logo_url:
+            try:
+                resp = httpx.get(
+                    url,
+                    timeout=5.0,
+                    headers={"User-Agent": "Mozilla/5.0"},
+                    allow_redirects=True,
+                )
+                og_image = re.search(
+                    r'<meta[^>]*property=["\']og:image["\'][^>]*content=["\']([^"\']+)["\']',
+                    resp.text,
+                    re.I,
+                )
+                if not og_image:
+                    og_image = re.search(
+                        r'<meta[^>]*content=["\']([^"\']+og:image[^"\']*)["\'][^>]*property=["\']og:image["\']',
+                        resp.text,
+                        re.I,
+                    )
+                if og_image:
+                    logo_url = og_image.group(1)
+                    if logo_url and not logo_url.startswith(("http://", "https://")):
+                        logo_url = urljoin(url, logo_url)
+            except Exception:
+                pass
 
         if not logo_url:
             try:

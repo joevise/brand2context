@@ -18,6 +18,8 @@ def search_social_public(brand_name: str, url: str = "") -> list[dict]:
     queries = []
     has_chinese = any("\u4e00" <= c <= "\u9fff" for c in brand_name)
 
+    queries.append(f'"{brand_name}" 百科 创始 成立 总部 创始人')
+    queries.append(f'"{brand_name}" Wikipedia founded headquarters')
     queries.append(f'"{brand_name}" 微博 最新')
     queries.append(f'"{brand_name}" 小红书 种草 测评')
 
