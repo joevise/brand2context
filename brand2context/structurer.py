@@ -143,97 +143,61 @@ def _extract_dimension(
     clues: dict,
 ) -> dict:
     """Extract a single dimension using LLM with focused context."""
-    schema_text = json.dumps(dimension_schema, ensure_ascii=False, indent=2)
+    from .templates import DIMENSION_TEMPLATES, validate_and_fix
+
+    template = DIMENSION_TEMPLATES.get(dimension, {})
+    template_text = json.dumps(template, ensure_ascii=False, indent=2)
     clues_text = json.dumps(clues, ensure_ascii=False, indent=2)
 
-    prompt = f"""You are a brand analyst extracting the "{dimension}" dimension of a brand knowledge base.
+    prompt = f"""请根据以下品牌信息，填充这个JSON模板。
 
-## {dimension.upper()} SCHEMA:
-{schema_text}
+## 模板（只填入值，不要改变结构）：
+{template_text}
 
-## RULES:
-1. Fill in as many fields as possible from the provided context
-2. "schema_version" MUST be "0.4.0"
-3. For arrays, include at least the key fields
-4. Output ONLY valid JSON matching the schema above
-5. If insufficient data, output an empty object or minimal valid structure
-6. 每条新闻、活动、公告等信息必须包含 source_url 字段（从上下文中提取原始 URL）。如果找不到 URL，填 null。
-7. CRITICAL: Never fabricate data. If the context does not contain information for a field, leave it empty (empty string or empty array). It is better to have missing data than false data.
-8. Only use information explicitly present in the context. If inferred or uncertain, prefix the value with [推断].
+## 规则：
+1. 不要添加、删除或重命名任何字段
+2. 数组字段：有多条数据就填多条，没有数据就留空数组 []
+3. 字符串字段：没有信息就留空字符串 ""
+4. 不要编造数据。如果不确定，加 [推断] 前缀
+5. 每条新闻、活动等信息尽量包含 source_url
+6. 用中文填写，品牌名和专有名词可保留英文
 
-## BRAND CLUES:
+## 品牌线索：
 {clues_text}
 
-## CONTEXT (relevant pages, search results, social data):
+## 上下文数据（网页、搜索结果、社交媒体）：
 {context}
 
-Generate the {dimension} JSON now:"""
+请直接输出填充后的JSON（不要包含任何解释）："""
 
     if dimension == "vitality":
-        prompt += '\n\nIMPORTANT: Output a FLAT JSON object with the field values directly. Do NOT output the schema structure (no "type", "properties" keys). Example:\n{"schema_version": "0.4.0", "content_frequency": "每周更新", "last_product_launch": "2024-09 新品系列", "growth_signal": "...", "market_position": "..."}'
-
+        prompt += "\n\n注意：输出扁平JSON对象，直接填字段值。不要输出schema结构。"
     if dimension == "campaigns":
-        prompt += '\n\nIMPORTANT: Output arrays of campaign objects with specific details. Each campaign must have name, type, date/start_date, summary, source_url. Example:\n{"schema_version": "0.4.0", "ongoing": [], "recent": [{"name": "品牌x联名系列", "type": "联名营销", "date": "2024-09-01", "summary": "...", "source_url": "https://..."}], "upcoming": [], "annual_events": []}'
+        prompt += "\n\n注意：每个活动对象需要name, type, date/start_date, summary, source_url字段。"
 
     try:
         result = chat_json(
             prompt,
-            system="You are a brand intelligence analyst. Output ONLY valid JSON matching the schema. Be thorough and precise. 请用中文填写所有字段内容。品牌名称、专有名词可保留英文原文。",
+            system="你是品牌信息提取专家。严格按模板结构输出JSON，不要改变字段名或结构。",
             max_tokens=4000,
         )
+        result = validate_and_fix(dimension, result)
         return result
     except Exception as e:
         print(f"   ⚠️  Dimension {dimension} extraction failed: {e}")
-        return {}
+        return dict(template)
 
 
 def _normalize_result(result: dict) -> dict:
-    """Normalize LLM output to ensure consistent structure."""
+    """Final pass: ensure schema_version and offerings.items consistency."""
     off = result.get("offerings", {})
-    if isinstance(off, dict):
-        if "name" in off and "offerings" not in off and "items" not in off:
-            result["offerings"] = {"schema_version": "0.4.0", "items": [off]}
-        elif "offerings" in off:
-            items = off["offerings"]
-            if isinstance(items, dict):
-                items = [items]
-            result["offerings"] = {"schema_version": "0.4.0", "items": items}
-        elif "items" in off:
-            items = off["items"]
-            if isinstance(items, dict):
-                items = [items]
-            result["offerings"] = {"schema_version": "0.4.0", "items": items}
-    elif isinstance(off, list):
-        result["offerings"] = {"schema_version": "0.4.0", "items": off}
-
-    content = result.get("content", {})
-    if isinstance(content, dict):
-        for field in ["latest_news", "blog_posts", "key_announcements"]:
-            if field in content and isinstance(content[field], dict):
-                content[field] = [content[field]]
-            elif field not in content:
-                content[field] = []
-        result["content"] = content
-
-    camp = result.get("campaigns", {})
-    if isinstance(camp, dict):
-        for field in ["ongoing", "recent", "upcoming", "annual_events"]:
-            if field in camp and isinstance(camp[field], dict):
-                camp[field] = [camp[field]]
-            elif field not in camp:
-                camp[field] = []
-        result["campaigns"] = camp
-
-    vit = result.get("vitality", {})
-    if isinstance(vit, dict) and "properties" in vit:
-        fixed_vit = {"schema_version": "0.4.0"}
-        for field, field_def in vit["properties"].items():
-            if isinstance(field_def, dict):
-                fixed_vit[field] = field_def.get("value", field_def.get("default", ""))
-            else:
-                fixed_vit[field] = field_def
-        result["vitality"] = fixed_vit
-
+    if isinstance(off, dict) and "items" not in off:
+        items = off.get("offerings", [])
+        if isinstance(items, dict):
+            items = [items]
+        if not isinstance(items, list):
+            items = []
+        result["offerings"] = {"items": items}
     return result
 
 
