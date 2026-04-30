@@ -373,23 +373,21 @@ def run_brand_pipeline(brand_id: str, url: str):
         brand.updated_at = datetime.now(timezone.utc)
         db.commit()
 
-        from brand2context.agent_pipeline import run_agent_pipeline
+        from brand2context.v2.researcher import run_researcher
 
         try:
-            result = run_agent_pipeline(
-                brand_id=brand_id,
-                url=url,
+            result = run_researcher(
+                brand_url=url,
                 brand_name=brand.name or "",
                 category=brand.category or "",
-                data_dir=DATA_DIR,
+                max_rounds=30,
+                verbose=True,
             )
-            # Agent pipeline stores data in {brand_id}/brand_knowledge.json
-            # but the rest of the app expects {brand_id}.json — write both
             output_path = os.path.join(DATA_DIR, f"{brand_id}.json")
             with open(output_path, "w", encoding="utf-8") as f:
                 json.dump(result, f, ensure_ascii=False, indent=2)
         except Exception as e:
-            print(f"⚠️ Agent pipeline failed: {e}, falling back to legacy pipeline")
+            print(f"⚠️ v2 researcher failed: {e}, falling back to legacy pipeline")
             result = _legacy_pipeline(brand_id, url, brand, db)
             if result is None:
                 return

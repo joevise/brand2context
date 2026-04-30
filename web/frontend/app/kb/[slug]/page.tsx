@@ -64,7 +64,6 @@ export default function PublicKBPage() {
   const identity = d?.identity;
   const offerings = d?.offerings;
   const trust = d?.trust;
-  const experience = d?.experience;
   const access = d?.access;
   const campaigns = d?.campaigns;
 
@@ -120,19 +119,6 @@ export default function PublicKBPage() {
               {trust.certifications?.length > 0 && <div className="flex flex-wrap gap-2">{trust.certifications.map((c: string, i: number) => <span key={i} className="px-2 py-1 rounded-full text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">{c}</span>)}</div>}
               {trust.partnerships?.length > 0 && <div><strong>合作伙伴：</strong> {trust.partnerships.join(", ")}</div>}
               {trust.testimonials?.length > 0 && trust.testimonials.map((t: any, i: number) => <blockquote key={i} className="border-l-2 border-primary-600 pl-3 italic text-[var(--muted-foreground)]">&ldquo;{t.quote}&rdquo; — {t.source}</blockquote>)}
-            </div>
-          </Accordion>
-        )}
-
-        {experience?.faq?.length > 0 && (
-          <Accordion title="常见问题" icon={MessageCircle}>
-            <div className="space-y-3">
-              {experience.faq.map((f: any, i: number) => (
-                <details key={i} className="group">
-                  <summary className="cursor-pointer font-medium text-sm hover:text-primary-600">{f.question}</summary>
-                  <p className="mt-1 text-sm text-[var(--muted-foreground)] pl-4">{f.answer}</p>
-                </details>
-              ))}
             </div>
           </Accordion>
         )}

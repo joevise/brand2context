@@ -805,7 +805,6 @@ DIMENSION_FIELD_MAP = {
         "awards",
     ],
     "trust": ["certifications", "partnerships", "user_stats", "testimonials"],
-    "experience": ["warranty", "return_policy", "onboarding", "community", "faq"],
     "access": ["official_website", "contact", "social_media"],
     "content": ["latest_news", "key_announcements", "blog_posts"],
     "perception": [
@@ -940,7 +939,6 @@ def get_brand_diagnosis(brand_id: str, db: Session = Depends(get_db)):
         "offerings",
         "differentiation",
         "trust",
-        "experience",
         "access",
         "content",
         "perception",

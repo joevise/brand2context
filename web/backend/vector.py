@@ -35,7 +35,7 @@ def index_brand(brand_id: str, data: dict):
     # Chunk by dimension
     dimensions = [
         "identity", "offerings", "differentiation", "trust",
-        "experience", "access", "content", "perception",
+        "access", "content", "perception",
         "decision_factors", "vitality"
     ]
     

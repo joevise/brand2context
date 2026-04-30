@@ -57,8 +57,7 @@ const DIMENSION_TABS = [
   { key: "offerings", label: "产品服务", icon: Package },
   { key: "differentiation", label: "差异化", icon: Sparkles },
   { key: "trust", label: "信任背书", icon: Shield },
-  { key: "experience", label: "用户体验", icon: MessageCircle },
-  { key: "access", label: "获取方式", icon: MapPin },
+    { key: "access", label: "获取方式", icon: MapPin },
   { key: "content", label: "内容资产", icon: Newspaper },
   { key: "perception", label: "品牌感知", icon: Eye },
   { key: "decision_factors", label: "决策因子", icon: BarChart3 },
@@ -373,7 +372,7 @@ function KBSearchBar({ brandId, onDimensionClick }: { brandId: string; onDimensi
 
   const DIMENSION_LABELS: Record<string, string> = {
     identity: "品牌身份", offerings: "产品服务", differentiation: "差异化优势",
-    trust: "信任背书", experience: "用户体验", access: "获取方式",
+    trust: "信任背书", access: "获取方式",
     content: "内容资产", perception: "品牌感知", decision_factors: "决策因子", vitality: "品牌活力", campaigns: "品牌活动",
   };
 
@@ -1152,7 +1151,6 @@ export default function BrandDetailPage() {
             {activeTab === "offerings" && <OfferingsGrid data={d.offerings} editMode={editMode} onUpdate={handleUpdate} />}
             {activeTab === "differentiation" && <DifferentiationSection data={d.differentiation} editMode={editMode} onUpdate={handleUpdate} />}
             {activeTab === "trust" && <TrustSection data={d.trust} editMode={editMode} onUpdate={handleUpdate} />}
-            {activeTab === "experience" && <ExperienceSection data={d.experience} editMode={editMode} onUpdate={handleUpdate} />}
             {activeTab === "access" && <AccessSection data={d.access} editMode={editMode} onUpdate={handleUpdate} />}
             {activeTab === "content" && <ContentSection data={d.content} editMode={editMode} onUpdate={handleUpdate} />}
             {activeTab === "perception" && <PerceptionSection data={d.perception} editMode={editMode} onUpdate={handleUpdate} />}
