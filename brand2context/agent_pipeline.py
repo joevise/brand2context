@@ -86,21 +86,6 @@ def _inject_strategy_actions(
             }
         )
 
-    # experience: if score < 5 and round >= 2
-    if (
-        scores.get("experience", 10) < 5
-        and round_num >= 2
-        and "experience" not in existing_dims_with_explore
-    ):
-        injected.append(
-            {
-                "dimension": "experience",
-                "missing": "auto: explore faq",
-                "action": "explore",
-                "target_type": "faq",
-            }
-        )
-
     # campaigns: if score < 5 and round >= 2
     if scores.get("campaigns", 10) < 5 and round_num >= 2:
         # Adapt query to brand language

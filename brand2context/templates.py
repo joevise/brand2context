@@ -52,14 +52,6 @@ DIMENSION_TEMPLATES = {
         "user_stats": [],
         "testimonials": [],
     },
-    "experience": {
-        "warranty": "",
-        "return_policy": "",
-        "customer_service": {"channels": [], "hours": ""},
-        "faq": [],
-        "onboarding": "",
-        "community": "",
-    },
     "access": {
         "official_website": "",
         "online_stores": [],
